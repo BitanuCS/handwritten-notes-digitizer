@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import katex from "katex";
-import "katex/dist/katex.min.css";
 
 import { convertNotes } from "@/lib/api";
 import type { ConvertResponse } from "@/types/notes";
@@ -13,7 +12,6 @@ type State =
   | { status: "done"; result: ConvertResponse }
   | { status: "error"; message: string };
 
-// Rotation steps in degrees CCW; cycling through 0 → 90 → 180 → 270 → 0
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
 
@@ -24,9 +22,31 @@ const ROTATE_LABELS: Record<Rotation, string> = {
   270: "90° CW",
 };
 
-function renderEquation(latex: string): string {
+/**
+ * Renders a string that may contain LaTeX fragments (e.g. \frac{1}{50000})
+ * mixed with plain text. LaTeX fragments are replaced with KaTeX HTML;
+ * the rest is escaped and returned as an HTML string for dangerouslySetInnerHTML.
+ *
+ * Matches sequences like \cmd{...}{...} including nested braces one level deep.
+ */
+function renderWithLatex(text: string): string {
+  const LATEX_RE = /\\[a-zA-Z]+(?:\{(?:[^{}]|\{[^{}]*\})*\})*/g;
+  return text.replace(LATEX_RE, (fragment) => {
+    try {
+      return katex.renderToString(fragment, {
+        throwOnError: false,
+        displayMode: false,
+      });
+    } catch {
+      return fragment;
+    }
+  });
+}
+
+/** Full-block equation render (display mode, centred). */
+function renderEquationBlock(latex: string): string {
   try {
-    return katex.renderToString(latex, { throwOnError: false, displayMode: false });
+    return katex.renderToString(latex, { throwOnError: false, displayMode: true });
   } catch {
     return latex;
   }
@@ -87,7 +107,6 @@ export default function AppPage() {
             className="block w-full text-sm text-gray-700 border border-gray-200 rounded-xl cursor-pointer bg-white file:mr-4 file:py-2.5 file:px-4 file:border-0 file:rounded-l-xl file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors"
           />
 
-          {/* Image preview with rotation controls */}
           {preview && (
             <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
               <div className="overflow-hidden rounded-lg h-56 flex items-center justify-center bg-gray-50">
@@ -100,7 +119,10 @@ export default function AppPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500">
-                  Rotation: <span className="font-medium text-gray-700">{ROTATE_LABELS[rotation]}</span>
+                  Rotation:{" "}
+                  <span className="font-medium text-gray-700">
+                    {ROTATE_LABELS[rotation]}
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -153,20 +175,26 @@ export default function AppPage() {
                     No text blocks were extracted.
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {textBlocks.map((block, bi) =>
                       block.type === "equation" ? (
+                        // Full equation block — display mode, centred
                         <div
                           key={bi}
-                          className="py-1"
+                          className="py-2 overflow-x-auto"
                           dangerouslySetInnerHTML={{
-                            __html: renderEquation(block.text!),
+                            __html: renderEquationBlock(block.text!),
                           }}
                         />
                       ) : (
-                        <p key={bi} className="text-sm text-gray-800">
-                          {block.text}
-                        </p>
+                        // Text block — render inline LaTeX fragments if present
+                        <p
+                          key={bi}
+                          className="text-sm text-gray-800 leading-relaxed"
+                          dangerouslySetInnerHTML={{
+                            __html: renderWithLatex(block.text!),
+                          }}
+                        />
                       )
                     )}
                   </div>
