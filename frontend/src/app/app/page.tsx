@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import katex from "katex";
 
-import { convertNotes } from "@/lib/api";
+import { convertNotes, fetchPdf } from "@/lib/api";
 import type { ConvertResponse } from "@/types/notes";
 
 type State =
@@ -11,6 +11,8 @@ type State =
   | { status: "loading" }
   | { status: "done"; result: ConvertResponse }
   | { status: "error"; message: string };
+
+type PdfState = "idle" | "loading" | "error";
 
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
@@ -39,7 +41,6 @@ function stripDollars(s: string): string {
  */
 function renderWithLatex(text: string): string {
   if (text.includes("$")) {
-    // Split on $$...$$ then $...$ delimiters; render math, escape prose
     return text
       .split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g)
       .map((part) => {
@@ -55,7 +56,6 @@ function renderWithLatex(text: string): string {
       .join("");
   }
 
-  // No $ delimiters — render raw \cmd{} fragments inline, keep prose as text
   if (/\\[a-zA-Z]+\{/.test(text)) {
     return text.replace(
       /\\[a-zA-Z]+(?:\{(?:[^{}]|\{[^{}]*\})*\})*/g,
@@ -89,6 +89,7 @@ export default function AppPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [rotation, setRotation] = useState<Rotation>(0);
   const [state, setState] = useState<State>({ status: "idle" });
+  const [pdfState, setPdfState] = useState<PdfState>("idle");
 
   useEffect(() => {
     if (!file) { setPreview(null); return; }
@@ -108,11 +109,28 @@ export default function AppPage() {
     e.preventDefault();
     if (!file) return;
     setState({ status: "loading" });
+    setPdfState("idle");
     try {
       const result = await convertNotes([file], "white", rotation);
       setState({ status: "done", result });
     } catch (err) {
       setState({ status: "error", message: String(err) });
+    }
+  }
+
+  async function handleDownloadPdf() {
+    if (!file) return;
+    setPdfState("loading");
+    try {
+      const blobUrl = await fetchPdf([file], "white", rotation);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = "notes.pdf";
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+      setPdfState("idle");
+    } catch {
+      setPdfState("error");
     }
   }
 
@@ -123,7 +141,7 @@ export default function AppPage() {
           Digitize your notes
         </h1>
         <p className="text-sm text-gray-500 mb-8">
-          Upload a photo of handwritten notes and get a clean transcription.
+          Upload a photo of handwritten notes and get a clean transcription or A4 PDF.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -135,6 +153,7 @@ export default function AppPage() {
               setFile(e.target.files?.[0] ?? null);
               setRotation(0);
               setState({ status: "idle" });
+              setPdfState("idle");
             }}
             className="block w-full text-sm text-gray-700 border border-gray-200 rounded-xl cursor-pointer bg-white file:mr-4 file:py-2.5 file:px-4 file:border-0 file:rounded-l-xl file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors"
           />
@@ -167,14 +186,43 @@ export default function AppPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={!file || state.status === "loading"}
-            className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
-          >
-            {state.status === "loading" ? "Reading your notes…" : "Transcribe notes"}
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={!file || state.status === "loading"}
+              className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+            >
+              {state.status === "loading" ? "Reading your notes…" : "Transcribe notes"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={!file || pdfState === "loading"}
+              className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 disabled:opacity-50 hover:bg-indigo-50 hover:border-indigo-400 active:bg-indigo-100 transition-colors"
+            >
+              {pdfState === "loading" ? (
+                <>
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-700" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Download PDF
+                </>
+              )}
+            </button>
+          </div>
         </form>
+
+        {pdfState === "error" && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+            PDF generation failed. Please try again.
+          </div>
+        )}
 
         {state.status === "loading" && (
           <div className="mt-10 text-center text-sm text-gray-400">
@@ -210,7 +258,6 @@ export default function AppPage() {
                   <div className="space-y-3">
                     {textBlocks.map((block, bi) =>
                       block.type === "equation" ? (
-                        // Full equation block — display mode, centred
                         <div
                           key={bi}
                           className="py-2 overflow-x-auto"
@@ -219,7 +266,6 @@ export default function AppPage() {
                           }}
                         />
                       ) : (
-                        // Text block — render inline LaTeX fragments if present
                         <p
                           key={bi}
                           className="text-sm text-gray-800 leading-relaxed"

@@ -20,7 +20,7 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later).
 
 ## Current status
-- ✅ Phase 0 (setup), ✅ Phase 1 (landing page), ✅ Phase 2 (pipeline proof + polish). **Next: Phase 3** (positioned extraction + A4 PDF).
+- ✅ Phase 0–3 done. **Next: Phase 4** (colorization — color-code blocks by color_group).
 - Repo: https://github.com/BitanuCS/handwritten-notes-digitizer (public, branch `main`).
 - Phase table is in `PROJECT_PLAN.md` → "Progress / Current Status".
 
@@ -74,11 +74,20 @@ Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bi
   section in `PROJECT_PLAN.md`, then commit and push.
 - Push on every session end (user confirmed this is fine).
 
-## Open needs before Phase 3
-- ✅ Groq API key — working, in `backend/.env`.
-- ✅ Phase 2 pipeline validated with real handwritten photos.
-- Playwright A4 rendering (PDF output) — core of Phase 3. Check if Playwright browsers
-  are installed: `cd backend && ./.venv/bin/playwright install chromium`.
+## Phase 3 — what was built (for Phase 4 context)
+- **`backend/app/services/layout.py`** — `render_html(pages, theme)`: loads
+  `a4_white.html` / `a4_black.html` via Jinja2; positions each block absolutely
+  using `left/top/width` as percentages of the page (box coords normalized 0..1).
+  Equations get monospace/italic class; diagram blocks are skipped.
+- **`backend/app/services/pdf.py`** — `html_to_pdf(html)`: Playwright Chromium,
+  `set_content` → `page.pdf(format="A4", print_background=True)` → returns bytes.
+- **`backend/app/templates/a4_white.html`** — Jinja2 template, fully wired up with
+  block loop + absolute positioning.  `a4_black.html` also updated (dark theme stub).
+- **`backend/app/api/routes/notes.py`** — new `POST /api/pdf` endpoint: vision →
+  layout → PDF bytes → `application/pdf` response with `Content-Disposition: attachment`.
+- **`frontend/src/lib/api.ts`** — `fetchPdf(images, theme, rotate)` → blob URL.
+- **`frontend/src/app/app/page.tsx`** — "Download PDF" button next to "Transcribe";
+  separate `pdfState` ("idle"|"loading"|"error"); triggers blob download on success.
 
 ## Gotcha log
 - gh CLI: `~/.config` is root-owned → always `export GH_CONFIG_DIR="$HOME/.gh"`.

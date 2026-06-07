@@ -12,8 +12,8 @@
 | 0 — Setup | ✅ Done |
 | 1 — Landing page | ✅ Done |
 | 2 — Pipeline proof (photo → text) | ✅ Done |
-| 3 — Positioned extraction + A4 PDF | ⏭️ **Next** |
-| 4 — Colorization | ⬜ Pending |
+| 3 — Positioned extraction + A4 PDF | ✅ Done |
+| 4 — Colorization | ⏭️ **Next** |
 | 5 — White/black toggle | ⬜ Pending |
 | 6 — Cleanup + dates | ⬜ Pending |
 | 7 — Multi-page | ⬜ Pending |

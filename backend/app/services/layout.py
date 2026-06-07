@@ -1,13 +1,16 @@
-"""Layout service: structured Pages -> A4 HTML (Feature 3, 7).
+"""Layout service: structured Pages -> A4 HTML (Feature 3, 7)."""
 
-Phase 3 implements this. Renders each block as an absolutely-positioned element
-on an A4 canvas at its normalized box coordinates, using a readable font and the
-theme template (app/templates/a4_white.html / a4_black.html).
-"""
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader
 
 from app.schemas.notes import Page, PageTheme
+
+_TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
+_env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
 
 
 def render_html(pages: list[Page], theme: PageTheme) -> str:
     """Render structured pages into a single A4 HTML document."""
-    raise NotImplementedError("Implemented in Phase 3.")
+    tmpl = _env.get_template(f"a4_{theme.value}.html")
+    return tmpl.render(pages=pages)
