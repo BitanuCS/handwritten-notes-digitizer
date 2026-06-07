@@ -14,7 +14,7 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **frontend/** — Next.js 16 (App Router) + TypeScript + Tailwind **v4** (`bg-linear-*`,
   not `bg-gradient-*`). React 19.
 - **backend/** — Python 3.11 + FastAPI. venv at `backend/.venv`.
-- **AI** — Google Gemini 2.0 Flash (free tier) via `google-genai` SDK → structured JSON (Block{text,box,color_group,type}). Key: free at aistudio.google.com.
+- **AI** — Groq (Llama 4 Scout vision, free tier) via `groq` SDK → structured JSON (Block{text,box,color_group,type}). Key: free at console.groq.com.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later) for diagrams.
 
 ## Current status

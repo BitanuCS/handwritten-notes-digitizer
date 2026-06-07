@@ -8,7 +8,7 @@ pydantic
 pydantic-settings
 
 # AI
-google-genai
+groq
 
 # Rendering
 jinja2
