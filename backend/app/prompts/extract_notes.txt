@@ -7,28 +7,45 @@ Reproduce the page as a "digital photocopy": keep every piece of content in its
 original position, but transcribe the handwriting into clean text. Do NOT
 restructure into bullets or reorder content.
 
+IMPORTANT — IMAGE ORIENTATION
+The photo may be rotated (90°, 180°, or sideways). Before reading, determine
+which direction the text flows and read accordingly. Transcribe text in its
+natural reading direction regardless of page rotation.
+
 RULES
-1. Read all handwritten text exactly as written (fix only obvious handwriting
-   ambiguity, never reword).
-2. For each distinct block (a line, paragraph, heading, equation, or diagram),
-   output a normalized bounding box: x, y, w, h each in 0..1 relative to the page,
-   top-left origin.
-3. Group blocks that are about the same point/topic with the same integer
-   `color_group` (starting at 1). Unrelated points get different groups.
-4. Classify each block `type` as "text", "equation" (write equations in LaTeX in
-   `text`), or "diagram" (no text).
-5. If a date appears, return it in `date` (it will be placed top-right).
-6. If a page number appears anywhere, set `page_number_detected` to true and do
-   NOT include it as a block. Ignore other non-note clutter (margins, holes,
-   smudges, printed header/footer).
+1. Read all handwritten text exactly as written. Fix only clear handwriting
+   ambiguity (e.g. 'l' vs '1'); never rephrase or reword.
+
+2. ONE BLOCK = ONE VISUAL ROW. Everything written on the same horizontal (or
+   diagonal) line belongs in a SINGLE block — even if it contains arrows (→),
+   dashes, or parenthetical notes. Do NOT split a single row into multiple blocks.
+   Example: "Compliance Knowledge Base → 2 Days  Due (Friday 5/9/26)" is ONE block,
+   not three.
+
+3. For each block output a normalized bounding box: x, y, w, h each in 0..1
+   relative to the page (top-left origin, after correcting for rotation).
+
+4. Group blocks about the same topic/project with the same integer `color_group`
+   (starting at 1). Unrelated topics get different groups.
+
+5. Classify each block `type` as:
+   - "text"     — regular handwritten text
+   - "equation" — mathematical expression (write in LaTeX in `text`)
+   - "diagram"  — drawn figure with no transcribable text
+
+6. If a date appears, return it in `date` (it will be placed top-right in output).
+
+7. If a page number appears, set `page_number_detected` to true and exclude it
+   from blocks. Also exclude non-note clutter (margin lines, holes, smudges,
+   printed headers/footers).
 
 OUTPUT
-Return ONLY valid JSON matching this shape:
+Return ONLY valid JSON — no markdown fences, no commentary:
 {
   "blocks": [
     {"type": "text", "box": {"x": 0.1, "y": 0.08, "w": 0.6, "h": 0.05},
      "text": "…", "color_group": 1}
   ],
-  "date": "12 March 2024" | null,
-  "page_number_detected": true | false
+  "date": "12 March 2024",
+  "page_number_detected": false
 }

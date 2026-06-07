@@ -8,7 +8,7 @@ from groq import AsyncGroq
 
 from app.core.config import settings
 from app.schemas.notes import Page
-from app.utils.images import detect_media_type
+from app.utils.images import prepare_image
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "extract_notes.txt"
 
@@ -25,8 +25,8 @@ def _get_client() -> AsyncGroq:
 async def extract_page(image_bytes: bytes) -> Page:
     """Run a single note photo through Groq vision into a structured Page."""
     prompt = _PROMPT_PATH.read_text()
-    media_type = detect_media_type(image_bytes)
-    image_data = base64.standard_b64encode(image_bytes).decode()
+    corrected, media_type = prepare_image(image_bytes)
+    image_data = base64.standard_b64encode(corrected).decode()
 
     client = _get_client()
     response = await client.chat.completions.create(
