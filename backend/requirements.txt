@@ -1,0 +1,18 @@
+# Web framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Config / validation
+pydantic
+pydantic-settings
+
+# AI
+anthropic
+
+# Rendering
+jinja2
+playwright
+
+# Image handling
+pillow

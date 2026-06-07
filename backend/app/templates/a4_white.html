@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    /* A4 page setup (Feature 7) */
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Inter", "Helvetica Neue", Arial, sans-serif; }
+
+    .page {
+      position: relative;            /* anchor for absolutely-positioned blocks */
+      width: 210mm;
+      height: 297mm;
+      background: #ffffff;
+      color: #1a1a1a;
+      overflow: hidden;
+      page-break-after: always;
+    }
+
+    /* Each block is positioned at its normalized box, scaled to the page. */
+    .block {
+      position: absolute;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .date {
+      position: absolute;
+      top: 10mm;
+      right: 12mm;
+      font-size: 11pt;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  {# Phase 3 fills this: one .page per Page, one .block per Block, colored per group. #}
+  {% for page in pages %}
+  <div class="page">
+    {% if page.date %}<div class="date">{{ page.date }}</div>{% endif %}
+    {# block rendering wired up in Phase 3 #}
+  </div>
+  {% endfor %}
+</body>
+</html>

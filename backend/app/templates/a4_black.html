@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    /* A4 page setup (Feature 7), dark theme variant (Feature 6) */
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Inter", "Helvetica Neue", Arial, sans-serif; }
+
+    .page {
+      position: relative;
+      width: 210mm;
+      height: 297mm;
+      background: #141414;
+      color: #f2f2f2;
+      overflow: hidden;
+      page-break-after: always;
+      -webkit-print-color-adjust: exact;   /* keep dark bg when printing */
+      print-color-adjust: exact;
+    }
+
+    .block {
+      position: absolute;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .date {
+      position: absolute;
+      top: 10mm;
+      right: 12mm;
+      font-size: 11pt;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  {% for page in pages %}
+  <div class="page">
+    {% if page.date %}<div class="date">{{ page.date }}</div>{% endif %}
+    {# block rendering wired up in Phase 3 #}
+  </div>
+  {% endfor %}
+</body>
+</html>
