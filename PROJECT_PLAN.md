@@ -21,8 +21,8 @@
 | 9 — Diagrams | ⬜ Pending |
 | 10 — Polish & launch | ⬜ Pending |
 
-**Repo:** https://github.com/BitanuCS/handwritten-notes-digitizer (pushed through Phase 1)
-**Before Phase 3 we need:** Anthropic API key in `backend/.env` (Phase 2 pipeline is built; key needed to test it end-to-end and for Phase 3).
+**Repo:** https://github.com/BitanuCS/handwritten-notes-digitizer (pushed through Phase 2 polish)
+**Before Phase 3:** All blockers cleared. Groq API key is live, pipeline validated with real photos. Check Playwright browsers installed: `cd backend && ./.venv/bin/playwright install chromium`.
 
 _This section is updated at the end of every phase._
 
@@ -91,7 +91,7 @@ This is the most important design decision and shapes the whole rendering engine
 |---|---|---|
 | Frontend | **Next.js + TypeScript + Tailwind** (+ shadcn/ui) | One ecosystem for the landing page + app UI; great for polished marketing pages. |
 | Backend | **Python + FastAPI** | Handles upload, the Claude vision call, and layout/PDF rendering. |
-| AI "brain" | **Claude vision (Opus / Sonnet 4.x)** via Anthropic API | Reads handwriting *and* returns structured JSON (text + boxes + color groups + diagram detection) in one call. |
+| AI "brain" | **Groq — Llama 4 Scout vision** (free: 14,400 req/day) | Reads handwriting *and* returns structured JSON (text + boxes + color groups + diagram detection) in one call. Free tier, no billing needed. |
 | PDF / A4 | **HTML + CSS (`@page A4`) rendered by Playwright** | Most reliable way to get pixel-precise A4 pages with colors, fonts, positioned blocks. |
 | Equations | **KaTeX** | Renders LaTeX the AI emits. |
 | Diagrams | **Crop + clean original** (early); **Mermaid.js** for flowcharts (later) | See "hard part" note below. |
@@ -196,7 +196,7 @@ ai-handwritten-notes/
 |---|---|---|
 | **0** | **Setup** — Next.js frontend + FastAPI backend skeletons, both run locally, live URL. | — |
 | **1** | **Landing page** — hero, how-it-works, example before/after, CTA. No AI yet. | 1 |
-| **2** | **Pipeline proof** — upload 1 photo → Claude → plain transcribed text on screen. Validates handwriting reading. | — |
+| **2** | **Pipeline proof** — upload 1 photo → Groq vision → transcribed text on screen. Image preview, 4-direction rotation, KaTeX equation rendering. Validated with real handwritten photos. | — |
 | **3** | **Positioned extraction + A4 PDF** — Claude returns blocks *with bounding boxes* → render onto A4 HTML → export PDF. Black-on-white. | 3, 7, 8 |
 | **4** | **Colorization** — group related blocks, assign distinct colors, render them. | 2 |
 | **5** | **White/black toggle** at upload — swap A4 template color scheme. | 6 |
