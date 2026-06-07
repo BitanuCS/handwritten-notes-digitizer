@@ -8,7 +8,7 @@ pydantic
 pydantic-settings
 
 # AI
-anthropic
+google-genai
 
 # Rendering
 jinja2

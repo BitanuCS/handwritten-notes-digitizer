@@ -14,7 +14,7 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **frontend/** — Next.js 16 (App Router) + TypeScript + Tailwind **v4** (`bg-linear-*`,
   not `bg-gradient-*`). React 19.
 - **backend/** — Python 3.11 + FastAPI. venv at `backend/.venv`.
-- **AI** — Claude vision via Anthropic API → structured JSON (Block{text,box,color_group,type}).
+- **AI** — Google Gemini 2.0 Flash (free tier) via `google-genai` SDK → structured JSON (Block{text,box,color_group,type}). Key: free at aistudio.google.com.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later) for diagrams.
 
 ## Current status
@@ -42,7 +42,7 @@ Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bi
 - Wire format is **snake_case** (Pydantic). `frontend/src/types/notes.ts` mirrors `backend/app/schemas/notes.py`.
 - Box coords are normalized 0..1 relative to the page.
 - Brand name "**Inkwell**" is a placeholder — single source in `frontend/src/lib/site.ts` (name, tagline, palette). User may rename.
-- Before writing code that calls the Anthropic API/models, consult the `claude-api` skill (per global instructions).
+- AI model: Gemini 2.0 Flash (free). Key in `backend/.env` as `GEMINI_API_KEY`. Get free key at https://aistudio.google.com/apikey.
 - `frontend/AGENTS.md` warns Next 16 differs from training data — check `frontend/node_modules/next/dist/docs/` when unsure.
 
 ## Working agreements
