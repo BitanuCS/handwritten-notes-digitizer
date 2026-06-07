@@ -11,8 +11,8 @@
 |---|---|
 | 0 — Setup | ✅ Done |
 | 1 — Landing page | ✅ Done |
-| 2 — Pipeline proof (photo → text) | ⏭️ **Next** |
-| 3 — Positioned extraction + A4 PDF | ⬜ Pending |
+| 2 — Pipeline proof (photo → text) | ✅ Done |
+| 3 — Positioned extraction + A4 PDF | ⏭️ **Next** |
 | 4 — Colorization | ⬜ Pending |
 | 5 — White/black toggle | ⬜ Pending |
 | 6 — Cleanup + dates | ⬜ Pending |
@@ -22,7 +22,7 @@
 | 10 — Polish & launch | ⬜ Pending |
 
 **Repo:** https://github.com/BitanuCS/handwritten-notes-digitizer (pushed through Phase 1)
-**Before Phase 2 we need:** Anthropic API key + 1–2 sample handwritten-note photos.
+**Before Phase 3 we need:** Anthropic API key in `backend/.env` (Phase 2 pipeline is built; key needed to test it end-to-end and for Phase 3).
 
 _This section is updated at the end of every phase._
 

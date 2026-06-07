@@ -18,7 +18,7 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later) for diagrams.
 
 ## Current status
-- ✅ Phase 0 (setup), ✅ Phase 1 (landing page). **Next: Phase 2** (photo→text pipeline proof).
+- ✅ Phase 0 (setup), ✅ Phase 1 (landing page), ✅ Phase 2 (pipeline proof). **Next: Phase 3** (positioned extraction + A4 PDF).
 - Repo: https://github.com/BitanuCS/handwritten-notes-digitizer (public, branch `main`).
 - Phase table is in `PROJECT_PLAN.md` → "Progress / Current Status".
 
@@ -50,9 +50,10 @@ Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bi
   section in `PROJECT_PLAN.md`, then commit and push.
 - Commit per phase. Push only when the user is ready (they've said push each change is fine).
 
-## Open needs before Phase 2
-- Anthropic API key (goes in `backend/.env`, see `.env.example`).
-- 1–2 sample handwritten-note photos to tune the extraction prompt.
+## Open needs before Phase 3
+- ✅ API key and photo — required for Phase 2 end-to-end test; same key powers Phase 3.
+- Playwright A4 rendering (PDF output) — core of Phase 3.
 
 ## Gotcha log (append surprises here as the project grows)
-- (none yet beyond the gh/`~/.config` issue above)
+- gh CLI: `~/.config` is root-owned → always `export GH_CONFIG_DIR="$HOME/.gh"`.
+- Phase 2: `React.FormEvent` is deprecated in React 19 types ("doesn't actually exist"). Use `React.SyntheticEvent<HTMLFormElement>` instead.

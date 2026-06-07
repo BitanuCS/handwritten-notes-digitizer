@@ -1,6 +1,6 @@
 // Client for the FastAPI backend.
 
-import type { PageTheme } from "@/types/notes";
+import type { ConvertResponse, PageTheme } from "@/types/notes";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -13,14 +13,10 @@ export async function checkHealth(): Promise<boolean> {
   }
 }
 
-/**
- * Send note photos to the backend and get back the generated PDF.
- * Wired to a real response in Phase 2+ (the endpoint is a stub today).
- */
 export async function convertNotes(
   images: File[],
   theme: PageTheme,
-): Promise<Blob> {
+): Promise<ConvertResponse> {
   const form = new FormData();
   images.forEach((img) => form.append("images", img));
   form.append("theme", theme);
@@ -30,7 +26,8 @@ export async function convertNotes(
     body: form,
   });
   if (!res.ok) {
-    throw new Error(`Convert failed: ${res.status}`);
+    const detail = await res.text();
+    throw new Error(`Convert failed (${res.status}): ${detail}`);
   }
-  return res.blob();
+  return res.json() as Promise<ConvertResponse>;
 }

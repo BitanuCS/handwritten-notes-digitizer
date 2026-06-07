@@ -1,24 +1,33 @@
 """Notes conversion endpoint.
 
-The core pipeline (Phase 2+): uploaded images -> Claude vision -> structured
-pages -> colorize -> A4 HTML -> PDF. For now this is a stub that defines the
-shape of the API; the services it will call live in app/services/.
+Phase 2: uploaded image -> Claude vision -> structured Page (no PDF yet).
+Phase 3+: add colorize -> A4 HTML -> PDF.
 """
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from app.schemas.notes import PageTheme
+from app.schemas.notes import ConvertResponse, Page, PageTheme
+from app.services.vision import extract_page
 
 router = APIRouter(prefix="/api", tags=["notes"])
 
 
-@router.post("/convert")
+@router.post("/convert", response_model=ConvertResponse)
 async def convert(
     images: list[UploadFile] = File(...),
     theme: PageTheme = Form(PageTheme.white),
-):
-    """Convert handwritten note photos into a digital A4 PDF.
+) -> ConvertResponse:
+    """Convert handwritten note photos into structured digital notes.
 
-    Not implemented yet — wired up in Phase 2 (vision) and Phase 3 (PDF).
+    Phase 2: returns extracted blocks (text + bounding boxes) as JSON.
+    Phase 3 will render these into a PDF.
     """
-    raise HTTPException(status_code=501, detail="Not implemented yet (Phase 2+).")
+    pages: list[Page] = []
+    for img in images:
+        data = await img.read()
+        try:
+            page = await extract_page(data)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        pages.append(page)
+    return ConvertResponse(pages=pages)
