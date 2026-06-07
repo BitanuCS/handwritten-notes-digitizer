@@ -1,6 +1,6 @@
 """Notes conversion endpoint.
 
-Phase 2: uploaded image -> Claude vision -> structured Page (no PDF yet).
+Phase 2: uploaded image -> Groq vision -> structured Page (no PDF yet).
 Phase 3+: add colorize -> A4 HTML -> PDF.
 """
 
@@ -16,17 +16,18 @@ router = APIRouter(prefix="/api", tags=["notes"])
 async def convert(
     images: list[UploadFile] = File(...),
     theme: PageTheme = Form(PageTheme.white),
+    rotate: bool = Form(False),
 ) -> ConvertResponse:
     """Convert handwritten note photos into structured digital notes.
 
-    Phase 2: returns extracted blocks (text + bounding boxes) as JSON.
-    Phase 3 will render these into a PDF.
+    rotate=true rotates each image 90° CCW before OCR — use when the photo
+    was taken sideways (e.g. notes written in a turned notebook).
     """
     pages: list[Page] = []
     for img in images:
         data = await img.read()
         try:
-            page = await extract_page(data)
+            page = await extract_page(data, rotate_ccw=rotate)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         pages.append(page)

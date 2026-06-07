@@ -16,10 +16,12 @@ export async function checkHealth(): Promise<boolean> {
 export async function convertNotes(
   images: File[],
   theme: PageTheme,
+  rotate: boolean = false,
 ): Promise<ConvertResponse> {
   const form = new FormData();
   images.forEach((img) => form.append("images", img));
   form.append("theme", theme);
+  form.append("rotate", String(rotate));
 
   const res = await fetch(`${API_BASE}/api/convert`, {
     method: "POST",
