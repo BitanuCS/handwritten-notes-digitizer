@@ -1,17 +1,23 @@
 """Notes conversion endpoints.
 
-Phase 2: /api/convert     — image -> Groq vision -> structured JSON.
-Phase 3: /api/pdf         — image -> vision -> A4 HTML -> PDF bytes.
-         /api/render-pdf  — ConvertResponse JSON -> A4 HTML -> PDF bytes (no vision re-run).
+Phase 2: /api/convert      — image -> Groq vision -> structured JSON.
+Phase 3: /api/pdf          — image -> vision -> A4 HTML -> PDF bytes.
+         /api/render-pdf   — ConvertResponse JSON -> A4 HTML -> PDF bytes (no vision re-run).
+         /api/html-to-pdf  — raw preview HTML -> A4 PDF (PDF = preview, pixel-exact).
 """
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel
 
 from app.schemas.notes import ConvertResponse, Page, PageTheme
-from app.services.layout import render_html
+from app.services.layout import render_html, wrap_preview_html
 from app.services.pdf import html_to_pdf
 from app.services.vision import extract_page
+
+
+class PreviewHtmlBody(BaseModel):
+    html: str
 
 router = APIRouter(prefix="/api", tags=["notes"])
 
@@ -77,6 +83,26 @@ async def render_pdf(
     html = render_html(body.pages, theme)
     try:
         pdf_bytes = await html_to_pdf(html)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF render failed: {exc}") from exc
+
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=_PDF_HEADERS)
+
+
+@router.post("/html-to-pdf")
+async def html_to_pdf_route(
+    body: PreviewHtmlBody,
+    theme: PageTheme = Query(PageTheme.white),
+) -> Response:
+    """Convert the frontend's already-rendered preview HTML to an A4 PDF.
+
+    The HTML is wrapped in A4 CSS and rendered via Playwright. Because the
+    content is pre-rendered KaTeX (not raw LaTeX), the PDF is pixel-identical
+    to what the user sees in the preview panel — no re-rendering step needed.
+    """
+    full_html = wrap_preview_html(body.html, theme)
+    try:
+        pdf_bytes = await html_to_pdf(full_html)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"PDF render failed: {exc}") from exc
 

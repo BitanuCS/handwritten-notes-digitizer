@@ -35,6 +35,28 @@ export async function convertNotes(
 }
 
 /**
+ * Convert the frontend's already-rendered preview innerHTML to a PDF.
+ * The backend wraps it in A4 CSS — no re-rendering or KaTeX needed.
+ * Returns a short-lived blob URL — revoke after use.
+ */
+export async function htmlToPdf(
+  innerHtml: string,
+  theme: PageTheme,
+): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/html-to-pdf?theme=${theme}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ html: innerHtml }),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`PDF failed (${res.status}): ${detail}`);
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+/**
  * Render an already-extracted (possibly edited) ConvertResponse to PDF.
  * Returns a short-lived blob URL — revoke after use.
  */

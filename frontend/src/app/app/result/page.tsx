@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import katex from "katex";
 
-import { renderPdf } from "@/lib/api";
+import { htmlToPdf } from "@/lib/api";
 import type { ConvertResponse, PageTheme } from "@/types/notes";
 
 type PdfState = "idle" | "loading" | "error";
@@ -69,19 +69,6 @@ function blocksToText(result: ConvertResponse): string {
     .join("\n\n");
 }
 
-function textToResult(text: string, original: ConvertResponse): ConvertResponse {
-  return {
-    pages: [
-      {
-        blocks: [
-          { type: "text", box: { x: 0, y: 0, w: 1, h: 1 }, text, color_group: null },
-        ],
-        date: original.pages[0]?.date ?? null,
-        page_number_detected: false,
-      },
-    ],
-  };
-}
 
 // ─── Result page ──────────────────────────────────────────────────────────────
 
@@ -95,6 +82,7 @@ export default function ResultPage() {
   // Resizable split: percentage of total width given to the left (edit) panel.
   const [splitPct, setSplitPct] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
   // Load result from sessionStorage on mount.
@@ -140,10 +128,11 @@ export default function ResultPage() {
   }
 
   async function handleDownloadPdf() {
-    if (!result) return;
+    if (!previewRef.current) return;
     setPdfState("loading");
     try {
-      const blobUrl = await renderPdf(textToResult(editedText, result), theme);
+      // Send the preview's already-rendered HTML — PDF is pixel-identical to preview.
+      const blobUrl = await htmlToPdf(previewRef.current.innerHTML, theme);
       const a = document.createElement("a");
       a.href = blobUrl;
       a.download = "notes.pdf";
@@ -250,6 +239,7 @@ export default function ResultPage() {
           </div>
           <div className="flex-1 overflow-y-auto px-8 py-6">
             <div
+              ref={previewRef}
               className="text-sm text-gray-800 leading-relaxed"
               dangerouslySetInnerHTML={{ __html: renderPreviewHtml(editedText) }}
             />

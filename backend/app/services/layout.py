@@ -58,3 +58,35 @@ def render_html(pages: list[Page], theme: PageTheme) -> str:
     tmpl = _env.get_template(f"a4_{theme.value}.html")
     flow_pages = [_build_flow_items(p) for p in pages]
     return tmpl.render(pages=pages, flow_pages=flow_pages)
+
+
+def wrap_preview_html(inner_html: str, theme: PageTheme) -> str:
+    """Wrap frontend-rendered preview HTML in a minimal A4 document for PDF export.
+
+    The inner_html is already KaTeX-rendered by the browser, so no JS needed —
+    only the KaTeX CSS for styling the pre-rendered spans.
+    """
+    bg = "#141414" if theme == PageTheme.black else "#ffffff"
+    fg = "#e8e8e8" if theme == PageTheme.black else "#1a1a1a"
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <style>
+    @page {{ size: A4; margin: 20mm 18mm; }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: {fg};
+      background: {bg};
+    }}
+  </style>
+</head>
+<body>
+  {inner_html}
+</body>
+</html>"""
