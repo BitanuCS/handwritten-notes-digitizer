@@ -5,6 +5,29 @@
 
 ---
 
+## Progress / Current Status
+
+| Phase | Status |
+|---|---|
+| 0 — Setup | ✅ Done |
+| 1 — Landing page | ✅ Done |
+| 2 — Pipeline proof (photo → text) | ⏭️ **Next** |
+| 3 — Positioned extraction + A4 PDF | ⬜ Pending |
+| 4 — Colorization | ⬜ Pending |
+| 5 — White/black toggle | ⬜ Pending |
+| 6 — Cleanup + dates | ⬜ Pending |
+| 7 — Multi-page | ⬜ Pending |
+| 8 — Review/edit screen | ⬜ Pending |
+| 9 — Diagrams | ⬜ Pending |
+| 10 — Polish & launch | ⬜ Pending |
+
+**Repo:** https://github.com/BitanuCS/handwritten-notes-digitizer (pushed through Phase 1)
+**Before Phase 2 we need:** Anthropic API key + 1–2 sample handwritten-note photos.
+
+_This section is updated at the end of every phase._
+
+---
+
 ## 1. Project Overview
 
 A web tool where users upload **one or more photos of handwritten notes**, and AI generates **clean digital notes** as a downloadable **A4 PDF**.
