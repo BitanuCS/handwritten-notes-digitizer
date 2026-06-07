@@ -23,24 +23,19 @@ const ROTATE_LABELS: Record<Rotation, string> = {
 };
 
 /**
- * Renders a string that may contain LaTeX fragments (e.g. \frac{1}{50000})
- * mixed with plain text. LaTeX fragments are replaced with KaTeX HTML;
- * the rest is escaped and returned as an HTML string for dangerouslySetInnerHTML.
- *
- * Matches sequences like \cmd{...}{...} including nested braces one level deep.
+ * If the text contains any LaTeX command (\frac, \sum, etc.), render the
+ * entire string with KaTeX inline mode so nothing appears as plain text
+ * alongside the rendered math. Plain-text blocks pass through unchanged.
  */
 function renderWithLatex(text: string): string {
-  const LATEX_RE = /\\[a-zA-Z]+(?:\{(?:[^{}]|\{[^{}]*\})*\})*/g;
-  return text.replace(LATEX_RE, (fragment) => {
+  if (/\\[a-zA-Z]+/.test(text)) {
     try {
-      return katex.renderToString(fragment, {
-        throwOnError: false,
-        displayMode: false,
-      });
+      return katex.renderToString(text, { throwOnError: false, displayMode: false });
     } catch {
-      return fragment;
+      return text;
     }
-  });
+  }
+  return text;
 }
 
 /** Full-block equation render (display mode, centred). */
