@@ -34,20 +34,18 @@ export async function convertNotes(
   return res.json() as Promise<ConvertResponse>;
 }
 
-/** Fetches a rendered A4 PDF and returns a short-lived blob URL for download. */
-export async function fetchPdf(
-  images: File[],
+/**
+ * Render an already-extracted (possibly edited) ConvertResponse to PDF.
+ * Returns a short-lived blob URL — revoke after use.
+ */
+export async function renderPdf(
+  data: ConvertResponse,
   theme: PageTheme,
-  rotate: number = 0,
 ): Promise<string> {
-  const form = new FormData();
-  images.forEach((img) => form.append("images", img));
-  form.append("theme", theme);
-  form.append("rotate", String(rotate));
-
-  const res = await fetch(`${API_BASE}/api/pdf`, {
+  const res = await fetch(`${API_BASE}/api/render-pdf?theme=${theme}`, {
     method: "POST",
-    body: form,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
   });
   if (!res.ok) {
     const detail = await res.text();

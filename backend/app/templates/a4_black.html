@@ -6,26 +6,25 @@
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
   <style>
-    @page { size: A4; margin: 0; }
+    @page { size: A4; margin: 20mm 18mm; }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; }
+    body {
+      margin: 0;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #e8e8e8;
+      background: #141414;
+    }
 
     .page {
-      position: relative;
-      width: 210mm;
-      height: 297mm;
       background: #141414;
-      color: #f2f2f2;
-      overflow: hidden;
       page-break-after: always;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
 
     .block {
-      position: absolute;
-      font-size: 10pt;
-      line-height: 1.4;
       white-space: pre-wrap;
       word-break: break-word;
     }
@@ -33,30 +32,28 @@
     .block-equation {
       font-family: "Courier New", Courier, monospace;
       font-style: italic;
+      text-align: center;
       color: #a8d8ea;
     }
 
     .date {
-      position: absolute;
-      top: 10mm;
-      right: 12mm;
+      text-align: right;
       font-size: 9pt;
       color: #888;
       font-style: italic;
+      margin-bottom: 0.8em;
     }
   </style>
 </head>
 <body>
-  {% for page in pages %}
+  {% for i in range(pages|length) %}
   <div class="page">
-    {% if page.date %}<div class="date">{{ page.date }}</div>{% endif %}
-    {% for block in page.blocks %}
-      {% if block.type != 'diagram' and block.text %}
-      <div
-        class="block{% if block.type == 'equation' %} block-equation{% endif %}"
-        style="left: {{ (block.box.x * 100) | round(2) }}%; top: {{ (block.box.y * 100) | round(2) }}%; width: {{ (block.box.w * 100) | round(2) }}%;"
-      >{{ block.text }}</div>
-      {% endif %}
+    {% if pages[i].date %}<div class="date">{{ pages[i].date }}</div>{% endif %}
+    {% for item in flow_pages[i] %}
+    <div
+      class="block{% if item.block_type == 'equation' %} block-equation{% endif %}"
+      style="margin-top: {{ '%.2f'|format(item.gap_em) }}em;"
+    >{{ item.text }}</div>
     {% endfor %}
   </div>
   {% endfor %}

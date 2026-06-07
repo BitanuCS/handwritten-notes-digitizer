@@ -1,16 +1,60 @@
-"""Layout service: structured Pages -> A4 HTML (Feature 3, 7)."""
+"""Layout service: structured Pages -> A4 HTML (Feature 3, 7).
 
+Converts AI-extracted blocks into a sorted reading-order flow layout.
+Absolute positioning is intentionally avoided — AI bounding boxes are
+approximate and produce ragged edges when used for pixel placement.
+"""
+
+from dataclasses import dataclass
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from app.schemas.notes import Page, PageTheme
+from app.schemas.notes import BlockType, Page, PageTheme
 
 _TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 _env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
+
+# A4 at 11pt/1.5 line-height is ~85 em tall inside 20mm margins.
+# Multiply normalized y-delta by this to get an em gap.
+_PAGE_HEIGHT_EM = 85.0
+# Cap the blank space between any two blocks so the AI's habit of
+# spreading blocks across the full page doesn't create huge whitespace.
+_MAX_GAP_EM = 3.0
+
+
+@dataclass
+class FlowItem:
+    block_type: BlockType
+    text: str
+    gap_em: float       # margin-top before this item
+    color_group: int | None
+
+
+def _build_flow_items(page: Page) -> list[FlowItem]:
+    """Convert one page's blocks into a sorted, gap-annotated list."""
+    eligible = [b for b in page.blocks if b.type != BlockType.diagram and b.text]
+    eligible.sort(key=lambda b: (b.box.y, b.box.x))
+
+    items: list[FlowItem] = []
+    for i, block in enumerate(eligible):
+        if i == 0:
+            gap_em = 0.0
+        else:
+            prev = eligible[i - 1]
+            raw = (block.box.y - prev.box.y) * _PAGE_HEIGHT_EM
+            gap_em = min(max(raw, 0.0), _MAX_GAP_EM)
+        items.append(FlowItem(
+            block_type=block.type,
+            text=block.text,  # type: ignore[arg-type]
+            gap_em=gap_em,
+            color_group=block.color_group,
+        ))
+    return items
 
 
 def render_html(pages: list[Page], theme: PageTheme) -> str:
     """Render structured pages into a single A4 HTML document."""
     tmpl = _env.get_template(f"a4_{theme.value}.html")
-    return tmpl.render(pages=pages)
+    flow_pages = [_build_flow_items(p) for p in pages]
+    return tmpl.render(pages=pages, flow_pages=flow_pages)

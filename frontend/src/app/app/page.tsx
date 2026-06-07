@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import katex from "katex";
 
-import { convertNotes, fetchPdf } from "@/lib/api";
-import type { ConvertResponse } from "@/types/notes";
+import { convertNotes, renderPdf } from "@/lib/api";
+import type { ConvertResponse, PageTheme } from "@/types/notes";
 
 type State =
   | { status: "idle" }
@@ -13,6 +13,9 @@ type State =
   | { status: "error"; message: string };
 
 type PdfState = "idle" | "loading" | "error";
+
+// edit text keyed by "pageIndex-blockIndex"
+type EditMap = Map<string, string>;
 
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
@@ -35,10 +38,6 @@ function stripDollars(s: string): string {
   return t;
 }
 
-/**
- * Renders a text block that may contain $...$ inline math or raw \cmd{} fragments.
- * Prose stays as HTML text; only the math parts go through KaTeX.
- */
 function renderWithLatex(text: string): string {
   if (text.includes("$")) {
     return text
@@ -55,7 +54,6 @@ function renderWithLatex(text: string): string {
       })
       .join("");
   }
-
   if (/\\[a-zA-Z]+\{/.test(text)) {
     return text.replace(
       /\\[a-zA-Z]+(?:\{(?:[^{}]|\{[^{}]*\})*\})*/g,
@@ -68,11 +66,9 @@ function renderWithLatex(text: string): string {
       }
     );
   }
-
   return escapeHtml(text);
 }
 
-/** Full-block equation render (display mode, centred). Strips $/$$ delimiters. */
 function renderEquationBlock(latex: string): string {
   try {
     return katex.renderToString(stripDollars(latex), {
@@ -88,8 +84,10 @@ export default function AppPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [rotation, setRotation] = useState<Rotation>(0);
+  const [theme] = useState<PageTheme>("white");
   const [state, setState] = useState<State>({ status: "idle" });
   const [pdfState, setPdfState] = useState<PdfState>("idle");
+  const [edits, setEdits] = useState<EditMap>(new Map());
 
   useEffect(() => {
     if (!file) { setPreview(null); return; }
@@ -98,11 +96,36 @@ export default function AppPage() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  // Initialise edit map whenever a new transcription arrives.
+  useEffect(() => {
+    if (state.status !== "done") return;
+    const map = new Map<string, string>();
+    state.result.pages.forEach((page, pi) => {
+      page.blocks.forEach((block, bi) => {
+        if (block.text != null) map.set(`${pi}-${bi}`, block.text);
+      });
+    });
+    setEdits(map);
+  }, [state]);
+
   function cycleRotation() {
     setRotation((r) => {
       const idx = ROTATIONS.indexOf(r);
       return ROTATIONS[(idx + 1) % ROTATIONS.length];
     });
+  }
+
+  function getEditedResult(): ConvertResponse {
+    if (state.status !== "done") throw new Error("no result");
+    return {
+      pages: state.result.pages.map((page, pi) => ({
+        ...page,
+        blocks: page.blocks.map((block, bi) => ({
+          ...block,
+          text: edits.get(`${pi}-${bi}`) ?? block.text,
+        })),
+      })),
+    };
   }
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
@@ -111,7 +134,7 @@ export default function AppPage() {
     setState({ status: "loading" });
     setPdfState("idle");
     try {
-      const result = await convertNotes([file], "white", rotation);
+      const result = await convertNotes([file], theme, rotation);
       setState({ status: "done", result });
     } catch (err) {
       setState({ status: "error", message: String(err) });
@@ -119,10 +142,10 @@ export default function AppPage() {
   }
 
   async function handleDownloadPdf() {
-    if (!file) return;
+    if (state.status !== "done") return;
     setPdfState("loading");
     try {
-      const blobUrl = await fetchPdf([file], "white", rotation);
+      const blobUrl = await renderPdf(getEditedResult(), theme);
       const a = document.createElement("a");
       a.href = blobUrl;
       a.download = "notes.pdf";
@@ -141,7 +164,7 @@ export default function AppPage() {
           Digitize your notes
         </h1>
         <p className="text-sm text-gray-500 mb-8">
-          Upload a photo of handwritten notes and get a clean transcription or A4 PDF.
+          Upload a photo of handwritten notes, review the transcription, then download a clean A4 PDF.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -171,9 +194,7 @@ export default function AppPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500">
                   Rotation:{" "}
-                  <span className="font-medium text-gray-700">
-                    {ROTATE_LABELS[rotation]}
-                  </span>
+                  <span className="font-medium text-gray-700">{ROTATE_LABELS[rotation]}</span>
                 </span>
                 <button
                   type="button"
@@ -186,43 +207,14 @@ export default function AppPage() {
             </div>
           )}
 
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={!file || state.status === "loading"}
-              className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
-            >
-              {state.status === "loading" ? "Reading your notes…" : "Transcribe notes"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={!file || pdfState === "loading"}
-              className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 disabled:opacity-50 hover:bg-indigo-50 hover:border-indigo-400 active:bg-indigo-100 transition-colors"
-            >
-              {pdfState === "loading" ? (
-                <>
-                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-700" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                  Download PDF
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={!file || state.status === "loading"}
+            className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+          >
+            {state.status === "loading" ? "Reading your notes…" : "Transcribe notes"}
+          </button>
         </form>
-
-        {pdfState === "error" && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-            PDF generation failed. Please try again.
-          </div>
-        )}
 
         {state.status === "loading" && (
           <div className="mt-10 text-center text-sm text-gray-400">
@@ -236,56 +228,105 @@ export default function AppPage() {
           </div>
         )}
 
-        {state.status === "done" &&
-          state.result.pages.map((page, pi) => {
-            const textBlocks = page.blocks.filter((b) => b.text);
-            return (
+        {state.status === "done" && (
+          <>
+            {state.result.pages.map((page, pi) => (
               <div
                 key={pi}
                 className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
               >
                 {page.date && (
-                  <p className="text-xs text-gray-400 text-right mb-4">
-                    {page.date}
-                  </p>
+                  <p className="text-xs text-gray-400 text-right mb-4">{page.date}</p>
                 )}
 
-                {textBlocks.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">
-                    No text blocks were extracted.
-                  </p>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-4">
+                  Review &amp; edit — fix any misreads before downloading
+                </p>
+
+                {page.blocks.length === 0 ? (
+                  <p className="text-sm text-gray-400 italic">No blocks were extracted.</p>
                 ) : (
-                  <div className="space-y-3">
-                    {textBlocks.map((block, bi) =>
-                      block.type === "equation" ? (
-                        <div
-                          key={bi}
-                          className="py-2 overflow-x-auto"
-                          dangerouslySetInnerHTML={{
-                            __html: renderEquationBlock(block.text!),
-                          }}
-                        />
-                      ) : (
-                        <p
-                          key={bi}
-                          className="text-sm text-gray-800 leading-relaxed"
-                          dangerouslySetInnerHTML={{
-                            __html: renderWithLatex(block.text!),
-                          }}
-                        />
-                      )
-                    )}
+                  <div className="space-y-5">
+                    {page.blocks.map((block, bi) => {
+                      if (block.type === "diagram") {
+                        return (
+                          <div
+                            key={bi}
+                            className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-xs text-gray-400 italic"
+                          >
+                            [diagram — not editable]
+                          </div>
+                        );
+                      }
+
+                      const key = `${pi}-${bi}`;
+                      const currentText = edits.get(key) ?? block.text ?? "";
+
+                      return (
+                        <div key={bi} className="space-y-1.5">
+                          {/* Live KaTeX preview */}
+                          <div
+                            className="text-sm text-gray-600 min-h-[1.5em] overflow-x-auto"
+                            dangerouslySetInnerHTML={{
+                              __html: block.type === "equation"
+                                ? renderEquationBlock(currentText)
+                                : renderWithLatex(currentText),
+                            }}
+                          />
+                          {/* Editable textarea */}
+                          <textarea
+                            value={currentText}
+                            rows={Math.max(2, currentText.split("\n").length)}
+                            spellCheck={block.type !== "equation"}
+                            className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-800 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-colors"
+                            onChange={(e) =>
+                              setEdits((prev) => new Map(prev).set(key, e.target.value))
+                            }
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
-                <p className="mt-4 text-xs text-gray-300">
-                  {page.blocks.length} block
-                  {page.blocks.length !== 1 ? "s" : ""} extracted
+                <p className="mt-5 text-xs text-gray-300">
+                  {page.blocks.length} block{page.blocks.length !== 1 ? "s" : ""} extracted
                   {page.page_number_detected ? " · page number removed" : ""}
                 </p>
               </div>
-            );
-          })}
+            ))}
+
+            {/* Download PDF — uses edited content */}
+            <div className="mt-6 flex flex-col items-stretch gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={pdfState === "loading"}
+                className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+              >
+                {pdfState === "loading" ? (
+                  <>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-300 border-t-white" />
+                    Generating PDF…
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    Download PDF
+                  </>
+                )}
+              </button>
+
+              {pdfState === "error" && (
+                <p className="text-center text-sm text-red-600">
+                  PDF generation failed — please try again.
+                </p>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </main>
   );
