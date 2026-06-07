@@ -16,18 +16,18 @@ router = APIRouter(prefix="/api", tags=["notes"])
 async def convert(
     images: list[UploadFile] = File(...),
     theme: PageTheme = Form(PageTheme.white),
-    rotate: bool = Form(False),
+    rotate: int = Form(0),
 ) -> ConvertResponse:
     """Convert handwritten note photos into structured digital notes.
 
-    rotate=true rotates each image 90° CCW before OCR — use when the photo
-    was taken sideways (e.g. notes written in a turned notebook).
+    rotate: degrees CCW to rotate before OCR (0, 90, 180, 270).
+    Use when the photo is sideways or upside-down.
     """
     pages: list[Page] = []
     for img in images:
         data = await img.read()
         try:
-            page = await extract_page(data, rotate_ccw=rotate)
+            page = await extract_page(data, rotate_deg=rotate)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         pages.append(page)

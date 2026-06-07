@@ -16,7 +16,7 @@ export async function checkHealth(): Promise<boolean> {
 export async function convertNotes(
   images: File[],
   theme: PageTheme,
-  rotate: boolean = false,
+  rotate: number = 0,
 ): Promise<ConvertResponse> {
   const form = new FormData();
   images.forEach((img) => form.append("images", img));

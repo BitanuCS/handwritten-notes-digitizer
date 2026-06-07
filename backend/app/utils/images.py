@@ -18,18 +18,17 @@ def detect_media_type(data: bytes) -> str:
     return "image/jpeg"
 
 
-def prepare_image(data: bytes, rotate_ccw: bool = False) -> tuple[bytes, str]:
+def prepare_image(data: bytes, rotate_deg: int = 0) -> tuple[bytes, str]:
     """Correct orientation and return (processed_bytes, media_type).
 
-    Applies EXIF transpose (phone rotation tag) then optionally rotates 90° CCW.
-    The explicit rotate is for photos taken sideways (e.g. turned notebook) where
-    WhatsApp stripped the EXIF — the user controls this from the UI.
+    Applies EXIF transpose first, then rotates by rotate_deg degrees CCW
+    (0, 90, 180, 270). User controls this from the UI when the photo is sideways.
     """
     img = Image.open(io.BytesIO(data))
     img = ImageOps.exif_transpose(img)
 
-    if rotate_ccw:
-        img = img.rotate(90, expand=True)
+    if rotate_deg:
+        img = img.rotate(rotate_deg, expand=True)
 
     if img.mode in ("RGBA", "P"):
         img = img.convert("RGB")

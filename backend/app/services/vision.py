@@ -22,10 +22,10 @@ def _get_client() -> AsyncGroq:
     return _client
 
 
-async def extract_page(image_bytes: bytes, rotate_ccw: bool = False) -> Page:
+async def extract_page(image_bytes: bytes, rotate_deg: int = 0) -> Page:
     """Run a single note photo through Groq vision into a structured Page."""
     prompt = _PROMPT_PATH.read_text()
-    corrected, media_type = prepare_image(image_bytes, rotate_ccw=rotate_ccw)
+    corrected, media_type = prepare_image(image_bytes, rotate_deg=rotate_deg)
     image_data = base64.standard_b64encode(corrected).decode()
 
     client = _get_client()

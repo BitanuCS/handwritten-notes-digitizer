@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 
 import { convertNotes } from "@/lib/api";
 import type { ConvertResponse } from "@/types/notes";
@@ -11,13 +13,31 @@ type State =
   | { status: "done"; result: ConvertResponse }
   | { status: "error"; message: string };
 
+// Rotation steps in degrees CCW; cycling through 0 → 90 → 180 → 270 → 0
+const ROTATIONS = [0, 90, 180, 270] as const;
+type Rotation = (typeof ROTATIONS)[number];
+
+const ROTATE_LABELS: Record<Rotation, string> = {
+  0: "No rotation",
+  90: "90° CCW",
+  180: "180°",
+  270: "90° CW",
+};
+
+function renderEquation(latex: string): string {
+  try {
+    return katex.renderToString(latex, { throwOnError: false, displayMode: false });
+  } catch {
+    return latex;
+  }
+}
+
 export default function AppPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [rotate, setRotate] = useState(false);
+  const [rotation, setRotation] = useState<Rotation>(0);
   const [state, setState] = useState<State>({ status: "idle" });
 
-  // Generate object URL preview whenever file changes
   useEffect(() => {
     if (!file) { setPreview(null); return; }
     const url = URL.createObjectURL(file);
@@ -25,12 +45,19 @@ export default function AppPage() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  function cycleRotation() {
+    setRotation((r) => {
+      const idx = ROTATIONS.indexOf(r);
+      return ROTATIONS[(idx + 1) % ROTATIONS.length];
+    });
+  }
+
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!file) return;
     setState({ status: "loading" });
     try {
-      const result = await convertNotes([file], "white", rotate);
+      const result = await convertNotes([file], "white", rotation);
       setState({ status: "done", result });
     } catch (err) {
       setState({ status: "error", message: String(err) });
@@ -48,40 +75,41 @@ export default function AppPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* File picker */}
           <input
             type="file"
             accept="image/*"
             aria-label="Choose a photo of handwritten notes"
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null);
-              setRotate(false);
+              setRotation(0);
               setState({ status: "idle" });
             }}
             className="block w-full text-sm text-gray-700 border border-gray-200 rounded-xl cursor-pointer bg-white file:mr-4 file:py-2.5 file:px-4 file:border-0 file:rounded-l-xl file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors"
           />
 
-          {/* Image preview + rotate toggle */}
+          {/* Image preview with rotation controls */}
           {preview && (
             <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-              <div className="overflow-hidden rounded-lg max-h-64 flex items-center justify-center bg-gray-50">
+              <div className="overflow-hidden rounded-lg h-56 flex items-center justify-center bg-gray-50">
                 <img
                   src={preview}
                   alt="Preview"
-                  style={{ transform: rotate ? "rotate(-90deg)" : "none", maxHeight: "240px", maxWidth: "100%", transition: "transform 0.2s" }}
+                  className="max-h-full max-w-full object-contain transition-transform duration-200"
+                  style={{ transform: `rotate(${-rotation}deg)` }}
                 />
               </div>
-              <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={rotate}
-                  onChange={(e) => setRotate(e.target.checked)}
-                  className="w-4 h-4 rounded accent-indigo-600"
-                />
-                <span className="text-sm text-gray-600">
-                  Photo is sideways — rotate before reading
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  Rotation: <span className="font-medium text-gray-700">{ROTATE_LABELS[rotation]}</span>
                 </span>
-              </label>
+                <button
+                  type="button"
+                  onClick={cycleRotation}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                >
+                  ↻ Rotate
+                </button>
+              </div>
             </div>
           )}
 
@@ -126,18 +154,21 @@ export default function AppPage() {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {textBlocks.map((block, bi) => (
-                      <p
-                        key={bi}
-                        className={
-                          block.type === "equation"
-                            ? "font-mono text-sm text-violet-700"
-                            : "text-sm text-gray-800"
-                        }
-                      >
-                        {block.text}
-                      </p>
-                    ))}
+                    {textBlocks.map((block, bi) =>
+                      block.type === "equation" ? (
+                        <div
+                          key={bi}
+                          className="py-1"
+                          dangerouslySetInnerHTML={{
+                            __html: renderEquation(block.text!),
+                          }}
+                        />
+                      ) : (
+                        <p key={bi} className="text-sm text-gray-800">
+                          {block.text}
+                        </p>
+                      )
+                    )}
                   </div>
                 )}
 
