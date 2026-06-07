@@ -14,9 +14,6 @@ type State =
 
 type PdfState = "idle" | "loading" | "error";
 
-// edit text keyed by "pageIndex-blockIndex"
-type EditMap = Map<string, string>;
-
 const ROTATIONS = [0, 90, 180, 270] as const;
 type Rotation = (typeof ROTATIONS)[number];
 
@@ -71,27 +68,33 @@ function renderWithLatex(text: string): string {
   return escapeHtml(text);
 }
 
-function renderEquationBlock(latex: string): string {
-  try {
-    return katex.renderToString(stripDollars(latex), {
-      throwOnError: false,
-      displayMode: true,
-    });
-  } catch {
-    return escapeHtml(latex);
-  }
+/** Join all extractable block texts from the result into one editable string. */
+function blocksToText(result: ConvertResponse): string {
+  return result.pages
+    .flatMap((p) => p.blocks.filter((b) => b.text).map((b) => b.text!))
+    .join("\n\n");
 }
 
-// ─── Upload / controls panel ─────────────────────────────────────────────────
+/** Wrap edited text back into a minimal ConvertResponse for the PDF endpoint. */
+function textToResult(text: string, original: ConvertResponse): ConvertResponse {
+  const date = original.pages[0]?.date ?? null;
+  return {
+    pages: [
+      {
+        blocks: [
+          { type: "text", box: { x: 0, y: 0, w: 1, h: 1 }, text, color_group: null },
+        ],
+        date,
+        page_number_detected: false,
+      },
+    ],
+  };
+}
+
+// ─── Upload / controls form ──────────────────────────────────────────────────
 
 function UploadForm({
-  file,
-  preview,
-  rotation,
-  isLoading,
-  onFileChange,
-  onRotate,
-  onSubmit,
+  file, preview, rotation, isLoading, onFileChange, onRotate, onSubmit,
 }: {
   file: File | null;
   preview: string | null;
@@ -157,7 +160,7 @@ export default function AppPage() {
   const [theme] = useState<PageTheme>("white");
   const [state, setState] = useState<State>({ status: "idle" });
   const [pdfState, setPdfState] = useState<PdfState>("idle");
-  const [edits, setEdits] = useState<EditMap>(new Map());
+  const [editedText, setEditedText] = useState("");
 
   useEffect(() => {
     if (!file) { setPreview(null); return; }
@@ -167,22 +170,8 @@ export default function AppPage() {
   }, [file]);
 
   useEffect(() => {
-    if (state.status !== "done") return;
-    const map = new Map<string, string>();
-    state.result.pages.forEach((page, pi) => {
-      page.blocks.forEach((block, bi) => {
-        if (block.text != null) map.set(`${pi}-${bi}`, block.text);
-      });
-    });
-    setEdits(map);
+    if (state.status === "done") setEditedText(blocksToText(state.result));
   }, [state]);
-
-  function cycleRotation() {
-    setRotation((r) => {
-      const idx = ROTATIONS.indexOf(r);
-      return ROTATIONS[(idx + 1) % ROTATIONS.length];
-    });
-  }
 
   function handleFileChange(f: File | null) {
     setFile(f);
@@ -191,17 +180,11 @@ export default function AppPage() {
     setPdfState("idle");
   }
 
-  function getEditedResult(): ConvertResponse {
-    if (state.status !== "done") throw new Error("no result");
-    return {
-      pages: state.result.pages.map((page, pi) => ({
-        ...page,
-        blocks: page.blocks.map((block, bi) => ({
-          ...block,
-          text: edits.get(`${pi}-${bi}`) ?? block.text,
-        })),
-      })),
-    };
+  function cycleRotation() {
+    setRotation((r) => {
+      const idx = ROTATIONS.indexOf(r);
+      return ROTATIONS[(idx + 1) % ROTATIONS.length];
+    });
   }
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
@@ -221,7 +204,8 @@ export default function AppPage() {
     if (state.status !== "done") return;
     setPdfState("loading");
     try {
-      const blobUrl = await renderPdf(getEditedResult(), theme);
+      const payload = textToResult(editedText, state.result);
+      const blobUrl = await renderPdf(payload, theme);
       const a = document.createElement("a");
       a.href = blobUrl;
       a.download = "notes.pdf";
@@ -233,19 +217,29 @@ export default function AppPage() {
     }
   }
 
-  const isDone = state.status === "done";
-
   // ── Two-column layout once results arrive ──────────────────────────────────
-  if (isDone) {
+  if (state.status === "done") {
     return (
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      <div className="grid grid-cols-2 h-screen overflow-hidden bg-gray-50">
 
-        {/* LEFT — upload controls + read-only rendered preview */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="py-10 px-8 max-w-xl">
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Digitize your notes</h1>
-            <p className="text-sm text-gray-400 mb-6">Upload a new photo or review the result on the right.</p>
+        {/* LEFT — rendered preview (updates live as user edits) */}
+        <div className="overflow-y-auto border-r border-gray-200 px-10 py-10">
+          <h2 className="text-base font-semibold text-gray-900 mb-1">Preview</h2>
+          <p className="text-xs text-gray-400 mb-6">Updates as you edit on the right.</p>
 
+          {state.result.pages[0]?.date && (
+            <p className="text-xs text-gray-400 text-right mb-4 italic">
+              {state.result.pages[0].date}
+            </p>
+          )}
+
+          <div
+            className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap"
+            dangerouslySetInnerHTML={{ __html: renderWithLatex(editedText) }}
+          />
+
+          <div className="mt-10 pt-6 border-t border-gray-100">
+            <p className="text-xs text-gray-400 mb-4">Convert a new photo:</p>
             <UploadForm
               file={file}
               preview={preview}
@@ -255,125 +249,28 @@ export default function AppPage() {
               onRotate={cycleRotation}
               onSubmit={handleSubmit}
             />
-
-            {/* Read-only rendered preview — updates live as user edits on the right */}
-            {state.result.pages.map((page, pi) => (
-              <div key={pi} className="mt-8">
-                {page.date && (
-                  <p className="text-xs text-gray-400 text-right mb-3 italic">{page.date}</p>
-                )}
-                <div className="space-y-3">
-                  {page.blocks.map((block, bi) => {
-                    if (block.type === "diagram") {
-                      return (
-                        <div key={bi} className="text-xs text-gray-300 italic py-1">
-                          [diagram]
-                        </div>
-                      );
-                    }
-                    const currentText = edits.get(`${pi}-${bi}`) ?? block.text ?? "";
-                    return block.type === "equation" ? (
-                      <div
-                        key={bi}
-                        className="overflow-x-auto py-1"
-                        dangerouslySetInnerHTML={{ __html: renderEquationBlock(currentText) }}
-                      />
-                    ) : (
-                      <p
-                        key={bi}
-                        className="text-sm text-gray-800 leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: renderWithLatex(currentText) }}
-                      />
-                    );
-                  })}
-                </div>
-                <p className="mt-4 text-xs text-gray-300">
-                  {page.blocks.length} block{page.blocks.length !== 1 ? "s" : ""}
-                  {page.page_number_detected ? " · page number removed" : ""}
-                </p>
-              </div>
-            ))}
           </div>
         </div>
 
-        {/* RIGHT — fixed editor panel */}
-        <aside className="w-[420px] shrink-0 border-l border-gray-200 bg-white flex flex-col">
+        {/* RIGHT — single editor panel */}
+        <div className="flex flex-col bg-white">
 
           {/* Panel header */}
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-900">Edit transcription</h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Fix any misreads below, then download.
-            </p>
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-base font-semibold text-gray-900">Edit</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Fix any misreads, then download.</p>
           </div>
 
-          {/* Scrollable block list */}
-          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-            {state.result.pages.map((page, pi) => (
-              <div key={pi}>
-                {state.result.pages.length > 1 && (
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
-                    Page {pi + 1}
-                  </p>
-                )}
-                <div className="space-y-4">
-                  {page.blocks.map((block, bi) => {
-                    if (block.type === "diagram") {
-                      return (
-                        <div
-                          key={bi}
-                          className="rounded-lg border border-dashed border-gray-200 px-3 py-2.5 text-xs text-gray-400 italic"
-                        >
-                          Diagram — not editable
-                        </div>
-                      );
-                    }
+          {/* Single textarea — takes all remaining height */}
+          <textarea
+            className="flex-1 resize-none px-6 py-5 text-sm text-gray-800 leading-relaxed focus:outline-none font-mono"
+            value={editedText}
+            spellCheck
+            onChange={(e) => setEditedText(e.target.value)}
+          />
 
-                    const key = `${pi}-${bi}`;
-                    const currentText = edits.get(key) ?? block.text ?? "";
-                    const isEquation = block.type === "equation";
-
-                    return (
-                      <div key={bi} className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                            isEquation
-                              ? "bg-violet-50 text-violet-600"
-                              : "bg-gray-100 text-gray-500"
-                          }`}>
-                            {isEquation ? "equation" : "text"}
-                          </span>
-                        </div>
-
-                        <textarea
-                          value={currentText}
-                          rows={Math.max(2, currentText.split("\n").length)}
-                          spellCheck={!isEquation}
-                          className={`w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 transition-colors ${
-                            isEquation ? "font-mono text-violet-800" : "text-gray-800"
-                          }`}
-                          onChange={(e) =>
-                            setEdits((prev) => new Map(prev).set(key, e.target.value))
-                          }
-                        />
-
-                        {/* Equation-only: live KaTeX preview below the textarea */}
-                        {isEquation && (
-                          <div
-                            className="overflow-x-auto rounded-lg bg-gray-50 px-3 py-2 text-sm"
-                            dangerouslySetInnerHTML={{ __html: renderEquationBlock(currentText) }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Panel footer — download button always visible */}
-          <div className="px-5 py-4 border-t border-gray-100 space-y-2">
+          {/* Panel footer — always visible */}
+          <div className="px-6 py-4 border-t border-gray-100 space-y-2">
             <button
               type="button"
               onClick={handleDownloadPdf}
@@ -398,12 +295,12 @@ export default function AppPage() {
               <p className="text-center text-xs text-red-500">PDF generation failed — try again.</p>
             )}
           </div>
-        </aside>
+        </div>
       </div>
     );
   }
 
-  // ── Single-column layout before results ────────────────────────────────────
+  // ── Single-column before results ───────────────────────────────────────────
   return (
     <main className="min-h-screen bg-gray-50 py-12 px-6">
       <div className="mx-auto max-w-2xl">
