@@ -22,28 +22,65 @@ const ROTATE_LABELS: Record<Rotation, string> = {
   270: "90° CW",
 };
 
-/**
- * If the text contains any LaTeX command (\frac, \sum, etc.), render the
- * entire string with KaTeX inline mode so nothing appears as plain text
- * alongside the rendered math. Plain-text blocks pass through unchanged.
- */
-function renderWithLatex(text: string): string {
-  if (/\\[a-zA-Z]+/.test(text)) {
-    try {
-      return katex.renderToString(text, { throwOnError: false, displayMode: false });
-    } catch {
-      return text;
-    }
-  }
-  return text;
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** Full-block equation render (display mode, centred). */
+function stripDollars(s: string): string {
+  const t = s.trim();
+  if (t.startsWith("$$") && t.endsWith("$$")) return t.slice(2, -2).trim();
+  if (t.startsWith("$") && t.endsWith("$")) return t.slice(1, -1).trim();
+  return t;
+}
+
+/**
+ * Renders a text block that may contain $...$ inline math or raw \cmd{} fragments.
+ * Prose stays as HTML text; only the math parts go through KaTeX.
+ */
+function renderWithLatex(text: string): string {
+  if (text.includes("$")) {
+    // Split on $$...$$ then $...$ delimiters; render math, escape prose
+    return text
+      .split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g)
+      .map((part) => {
+        if ((part.startsWith("$$") && part.endsWith("$$")) ||
+            (part.startsWith("$") && part.endsWith("$"))) {
+          return katex.renderToString(stripDollars(part), {
+            throwOnError: false,
+            displayMode: false,
+          });
+        }
+        return escapeHtml(part);
+      })
+      .join("");
+  }
+
+  // No $ delimiters — render raw \cmd{} fragments inline, keep prose as text
+  if (/\\[a-zA-Z]+\{/.test(text)) {
+    return text.replace(
+      /\\[a-zA-Z]+(?:\{(?:[^{}]|\{[^{}]*\})*\})*/g,
+      (fragment) => {
+        try {
+          return katex.renderToString(fragment, { throwOnError: false, displayMode: false });
+        } catch {
+          return escapeHtml(fragment);
+        }
+      }
+    );
+  }
+
+  return escapeHtml(text);
+}
+
+/** Full-block equation render (display mode, centred). Strips $/$$ delimiters. */
 function renderEquationBlock(latex: string): string {
   try {
-    return katex.renderToString(latex, { throwOnError: false, displayMode: true });
+    return katex.renderToString(stripDollars(latex), {
+      throwOnError: false,
+      displayMode: true,
+    });
   } catch {
-    return latex;
+    return escapeHtml(latex);
   }
 }
 
