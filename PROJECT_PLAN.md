@@ -14,6 +14,7 @@
 | 2 — Pipeline proof (photo → text) | ✅ Done |
 | 3 — Positioned extraction + A4 PDF | ✅ Done |
 | 4 — Colorization | ✅ Done |
+| 4.1 — Diagram rendering fix (two-pass extraction) | ✅ Done |
 | 5 — White/black toggle | ⏭️ **Next** |
 | 6 — Cleanup + dates | ⬜ Pending |
 | 7 — Multi-page | ⬜ Pending |

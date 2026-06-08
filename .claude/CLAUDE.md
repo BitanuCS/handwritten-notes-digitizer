@@ -20,26 +20,33 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later).
 
 ## Current status
-- ✅ Phase 0–4 done. ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 4.1** (fix diagram rendering — see bug below).
+- ✅ Phase 0–4 + **4.1 done** (diagram rendering fixed). ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 5** (white/black toggle).
 - Repo: https://github.com/BitanuCS/handwritten-notes-digitizer (public, branch `main`).
 - Phase table is in `PROJECT_PLAN.md` → "Progress / Current Status".
 
-## Known bug: diagrams not rendering (Phase 4.1 task)
-Root cause: AI (Groq Llama 4 Scout) returns `type: "diagram"` blocks but does NOT populate
-`diagram_data` with shapes/arrows. `enrich_pages()` in `layout.py` guards on
-`block.diagram_data is not None` — so no SVG is generated and the block disappears silently.
+## Phase 4.1 — diagram rendering FIXED (two-pass extraction)
+Was: Groq Llama 4 Scout returned `type: "diagram"` blocks but omitted `diagram_data`, so
+`enrich_pages()` skipped them and the diagram vanished silently. The renderer/schema/templates
+already worked — the model just wasn't producing shapes in the single combined prompt.
 
-Diagnosis:
-- `vision.py:53` does `Page(**data)`. Pydantic defaults `diagram_data=None` when AI omits it.
-- `enrich_pages()` skips blocks where `diagram_data` is None → `block.svg` stays None.
-- Frontend `buildPreviewHtml()` skips `diagram` blocks with no `svg` — no fallback, just gone.
-
-Fix approaches to explore in Phase 4.1:
-1. Fall back to a placeholder box/label when `diagram_data` is None (simple, always renders).
-2. Two-pass AI: first pass extracts text blocks; if a diagram is detected, a second targeted
-   prompt asks the AI to describe only that cropped region as shapes/arrows.
-3. Relax Pydantic validation so a partial `diagram_data` (missing shapes) still produces
-   a minimal SVG placeholder.
+Fix (chosen approach #2 — two-pass, with #1 as fallback):
+- **`vision.py:_fill_diagrams()`** runs after the first pass. For each `diagram` block whose
+  `diagram_data` is None/empty, it crops that region from the same orientation-corrected image
+  (`crop_normalized`) and re-prompts the model with a focused diagram-only prompt
+  (`_extract_diagram` + `prompts/extract_diagram.txt`). Isolated crops extract far better.
+  `_extract_diagram` returns None on any failure (bad JSON/schema/API) → caller falls back.
+- **`utils/images.py:crop_normalized(data, box, pad=0.02)`** — crops a normalized 0..1 region
+  out of already-corrected bytes (coords match what the model saw). Now imports `Box` from schemas.
+- **`diagrams.py:_placeholder_svg()`** — dashed labeled box, keeps original position/width.
+  `diagram_to_svg` now returns this placeholder when `diagram_data` is None OR has no shapes,
+  so a detected diagram is NEVER silently dropped.
+- **`layout.py:enrich_pages()`** now sets `block.svg` for ALL diagram blocks (placeholder
+  included), so the frontend always has an svg to render. No frontend change needed.
+- **`prompts/extract_notes.txt`** rule 5 — diagram block `box` must tightly enclose the WHOLE
+  figure (the box drives the crop, so accuracy matters).
+- Tests: `test_diagrams.py` updated for placeholder behavior; new `test_images.py` for crop.
+- Live-verified end-to-end: first pass detects diagram w/ no inline data → second pass recovers
+  shapes + arrows correctly. Cost = +1 Groq call per diagram (free tier 14,400/day, fine).
 
 ## How to run
 Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bin`.

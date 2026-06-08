@@ -84,7 +84,9 @@ def enrich_pages(pages: list[Page], theme: PageTheme) -> None:
     for page in pages:
         c = colorize(page, theme)
         for block in page.blocks:
-            if block.type == BlockType.diagram and block.diagram_data:
+            if block.type == BlockType.diagram:
+                # diagram_to_svg falls back to a placeholder when shapes are
+                # missing, so every diagram block gets a non-empty svg.
                 block.svg = diagram_to_svg(block, c, theme)
 
 

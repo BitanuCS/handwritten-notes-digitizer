@@ -10,11 +10,40 @@ from app.schemas.notes import Block, PageTheme
 _ARROW_COLORS = {PageTheme.white: "#888888", PageTheme.black: "#aaaaaa"}
 
 
+def _placeholder_svg(block: Block, theme: PageTheme) -> str:
+    """A dashed labeled box for diagrams whose shapes could not be extracted.
+
+    Keeps the diagram's original page position/width so the layout never loses a
+    block — the reader sees a clearly marked region where a figure was drawn.
+    """
+    bw = block.box.w
+    bh = block.box.h
+    vw = 100.0
+    vh = (bh / bw * 100.0) if bw > 0 else 40.0
+    color = _ARROW_COLORS[theme]
+    label = (block.text or "Diagram").strip() or "Diagram"
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'viewBox="0 0 {vw:.1f} {vh:.1f}" '
+        f'style="width:{bw * 100:.1f}%;height:auto;display:block;margin:0.5em 0">'
+        f'<rect x="1" y="1" width="{vw - 2:.1f}" height="{vh - 2:.1f}" rx="3" '
+        f'fill="none" stroke="{color}" stroke-width="0.5" stroke-dasharray="2 2"/>'
+        f'<text x="{vw / 2:.1f}" y="{vh / 2:.1f}" font-size="4" '
+        f'text-anchor="middle" dominant-baseline="middle" fill="{color}">'
+        f'▢ {label}</text>'
+        f'</svg>'
+    )
+
+
 def diagram_to_svg(block: Block, colors: dict[int, str], theme: PageTheme) -> str:
-    """Convert a diagram block's shapes + arrows into an inline SVG string."""
+    """Convert a diagram block's shapes + arrows into an inline SVG string.
+
+    Falls back to a labeled placeholder box when the block has no extractable
+    shapes, so a detected diagram is never silently dropped from the output.
+    """
     data = block.diagram_data
-    if not data:
-        return ""
+    if not data or not data.shapes:
+        return _placeholder_svg(block, theme)
 
     bw = block.box.w
     bh = block.box.h

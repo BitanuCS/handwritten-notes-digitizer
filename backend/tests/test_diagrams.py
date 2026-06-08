@@ -46,10 +46,26 @@ def test_diagram_to_svg_contains_svg_elements():
     assert svg.endswith("</svg>")
 
 
-def test_diagram_to_svg_no_data_returns_empty():
+def test_diagram_to_svg_no_data_returns_placeholder():
     block = Block(type=BlockType.diagram, box=Box(x=0, y=0, w=0.5, h=0.3))
     svg = diagram_to_svg(block, {}, PageTheme.white)
-    assert svg == ""
+    # No shapes -> a dashed placeholder box, never an empty/dropped block.
+    assert "<svg" in svg
+    assert "stroke-dasharray" in svg
+    assert "Diagram" in svg
+    assert svg.endswith("</svg>")
+
+
+def test_diagram_to_svg_empty_shapes_returns_placeholder():
+    from app.schemas.notes import DiagramData as _DD
+
+    block = Block(
+        type=BlockType.diagram,
+        box=Box(x=0, y=0, w=0.5, h=0.3),
+        diagram_data=_DD(shapes=[], arrows=[]),
+    )
+    svg = diagram_to_svg(block, {}, PageTheme.white)
+    assert "stroke-dasharray" in svg
 
 
 def test_diagram_to_svg_unknown_arrow_ids_skipped():

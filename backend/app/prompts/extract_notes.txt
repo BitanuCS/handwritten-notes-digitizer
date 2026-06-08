@@ -31,7 +31,11 @@ RULES
 5. Classify each block `type`:
    - "text"     — regular handwritten text
    - "equation" — mathematical expression (write in LaTeX in `text`)
-   - "diagram"  — drawn figure. Include a `diagram_data` object with:
+   - "diagram"  — any drawn figure (flowchart, boxes-and-arrows, mind-map, tree,
+       cycle, graph). The block `box` MUST tightly enclose the ENTIRE figure
+       (all shapes and the arrows between them) — this box is used to crop and
+       re-read the diagram, so accuracy here matters. If you can, also include a
+       `diagram_data` object with:
        "shapes": array of objects, each with:
          "id": unique string like "s1", "s2" …
          "kind": one of "box" | "rounded_box" | "diamond" | "circle" | "ellipse"
