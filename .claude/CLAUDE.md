@@ -20,7 +20,7 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later).
 
 ## Current status
-- ✅ Phase 0–3 done. **Next: Phase 4** (colorization — color-code blocks by color_group).
+- ✅ Phase 0–3 done. ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 4** (colorization).
 - Repo: https://github.com/BitanuCS/handwritten-notes-digitizer (public, branch `main`).
 - Phase table is in `PROJECT_PLAN.md` → "Progress / Current Status".
 
@@ -74,20 +74,47 @@ Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bi
   section in `PROJECT_PLAN.md`, then commit and push.
 - Push on every session end (user confirmed this is fine).
 
-## Phase 3 — what was built (for Phase 4 context)
-- **`backend/app/services/layout.py`** — `render_html(pages, theme)`: loads
-  `a4_white.html` / `a4_black.html` via Jinja2; positions each block absolutely
-  using `left/top/width` as percentages of the page (box coords normalized 0..1).
-  Equations get monospace/italic class; diagram blocks are skipped.
+## Phase 3 + Phase 8 core — what was built (for Phase 4 context)
+
+### PDF pipeline (Phase 3)
+- **`backend/app/services/layout.py`** — `render_html(pages, theme)` + `_build_flow_items()`:
+  sorts blocks by `box.y` (reading order), computes capped relative gaps (max `_MAX_GAP_EM=3.0`
+  em) between adjacent blocks. **No `position:absolute`** — AI boxes are too noisy for pixel
+  placement; flow layout gives clean, readable documents.
+  Also: `wrap_preview_html(inner_html, theme)` — wraps frontend-rendered HTML in A4 CSS for
+  the html-to-pdf endpoint (KaTeX already rendered as spans, only CSS needed).
 - **`backend/app/services/pdf.py`** — `html_to_pdf(html)`: Playwright Chromium,
-  `set_content` → `page.pdf(format="A4", print_background=True)` → returns bytes.
-- **`backend/app/templates/a4_white.html`** — Jinja2 template, fully wired up with
-  block loop + absolute positioning.  `a4_black.html` also updated (dark theme stub).
-- **`backend/app/api/routes/notes.py`** — new `POST /api/pdf` endpoint: vision →
-  layout → PDF bytes → `application/pdf` response with `Content-Disposition: attachment`.
-- **`frontend/src/lib/api.ts`** — `fetchPdf(images, theme, rotate)` → blob URL.
-- **`frontend/src/app/app/page.tsx`** — "Download PDF" button next to "Transcribe";
-  separate `pdfState` ("idle"|"loading"|"error"); triggers blob download on success.
+  `wait_until="networkidle"` (needed for KaTeX CDN to load and render).
+- **`backend/app/templates/a4_white.html`** / **`a4_black.html`** — Jinja2 with KaTeX CDN
+  (CSS + JS + auto-render), `@page { margin: 20mm 18mm }`, flow-layout block loop with
+  `margin-top` per block computed from `gap_em`.
+- **`backend/app/api/routes/notes.py`** — three PDF endpoints:
+  - `POST /api/pdf` — image → vision → layout → PDF (original pipeline)
+  - `POST /api/render-pdf` — `ConvertResponse` JSON body → layout → PDF (no vision re-run)
+  - `POST /api/html-to-pdf` — `{"html": "..."}` body → `wrap_preview_html` → Playwright PDF
+
+### Result page + edit UI (Phase 8 core, pulled forward)
+- **`frontend/src/app/app/page.tsx`** — upload-only; after transcription saves `ConvertResponse`
+  to `sessionStorage` and `router.push("/app/result")`.
+- **`frontend/src/app/app/result/page.tsx`** — dedicated result page:
+  - Reads `ConvertResponse` from `sessionStorage` on mount; redirects to `/app` if missing.
+  - **Left panel (Edit)**: single full-height monospace `<textarea>` with all block texts joined
+    by `\n\n`. User edits freely.
+  - **Drag handle**: 5px bar with grip dots; global `mousemove`/`mouseup` listeners resize both
+    panels in real time; `splitPct` clamped 20–80%; sets `body.userSelect` during drag.
+  - **Right panel (Preview)**: `renderPreviewHtml(editedText)` — splits on `\n`, runs
+    `renderWithLatex()` per line, joins with `<br>`. Updates live on every keystroke.
+  - **Download PDF** (top bar): reads `previewRef.current.innerHTML` → `htmlToPdf()` →
+    `/api/html-to-pdf`. PDF is a literal snapshot of the preview panel — pixel-identical.
+- **`frontend/src/lib/api.ts`** — `htmlToPdf(innerHtml, theme)` → blob URL.
+
+### Key architecture decisions (important for Phase 4)
+- `FlowItem` in `layout.py` already carries `color_group: int | None` — Phase 4 just needs
+  to map groups to CSS colors in the template and the preview renderer.
+- The AI already returns `color_group` per block; the prompt asks for it; Pydantic schema has it.
+- `renderPreviewHtml` renders the preview as plain text (no color). Phase 4 will need a
+  per-line color lookup in the preview too (from the original `ConvertResponse` blocks, which
+  are stored in `result` state alongside `editedText`).
 
 ## Gotcha log
 - gh CLI: `~/.config` is root-owned → always `export GH_CONFIG_DIR="$HOME/.gh"`.

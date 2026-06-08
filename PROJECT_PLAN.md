@@ -1,7 +1,7 @@
 # Handwritten Notes Digitization Tool — Project Plan
 
 > Reference document capturing all planning decisions. We refer to this while implementing.
-> Last updated: 2026-06-07
+> Last updated: 2026-06-08
 
 ---
 
@@ -17,12 +17,29 @@
 | 5 — White/black toggle | ⬜ Pending |
 | 6 — Cleanup + dates | ⬜ Pending |
 | 7 — Multi-page | ⬜ Pending |
-| 8 — Review/edit screen | ⬜ Pending |
+| 8 — Review/edit screen | ⚡ Core done (edit+preview+PDF); color tweaking pending |
 | 9 — Diagrams | ⬜ Pending |
 | 10 — Polish & launch | ⬜ Pending |
 
-**Repo:** https://github.com/BitanuCS/handwritten-notes-digitizer (pushed through Phase 2 polish)
-**Before Phase 3:** All blockers cleared. Groq API key is live, pipeline validated with real photos. Check Playwright browsers installed: `cd backend && ./.venv/bin/playwright install chromium`.
+**Repo:** https://github.com/BitanuCS/handwritten-notes-digitizer (pushed through Phase 3 + Phase 8 core)
+
+### What was built in the Phase 3 session (more than planned)
+
+**Phase 3 core (as planned):**
+- `layout.py` — `render_html(pages, theme)` + `_build_flow_items()`: sorts blocks by y-coordinate (reading order), computes capped relative gaps (max 3em) between blocks. Flow layout — intentionally no `position:absolute` since AI bounding boxes are too noisy for pixel placement.
+- `pdf.py` — `html_to_pdf(html)` via Playwright Chromium, `wait_until="networkidle"` so KaTeX CDN loads before capture.
+- `a4_white.html` / `a4_black.html` — Jinja2 templates with KaTeX CDN + auto-render, `@page { margin: 20mm 18mm }`, flow-layout blocks.
+- `POST /api/pdf` — image → vision → layout → PDF bytes.
+
+**Phase 8 core (pulled forward — edit/review screen):**
+- `POST /api/render-pdf` — accepts `ConvertResponse` JSON body (no image, no vision re-run) → layout → PDF.
+- `POST /api/html-to-pdf` — accepts `{"html": "..."}` (frontend's pre-rendered preview HTML) → wraps in A4 CSS → Playwright PDF. This makes PDF pixel-identical to preview.
+- `layout.py` — `wrap_preview_html(inner_html, theme)`: A4 CSS wrapper for the html-to-pdf endpoint.
+- **`/app/result` page** — dedicated result route; after transcription, result is saved to `sessionStorage` and the browser redirects here.
+  - Left panel: full-height monospace `<textarea>` (single box for entire transcription)
+  - Right panel: live KaTeX preview via `renderPreviewHtml()`, updates on every keystroke
+  - Drag handle between panels: resizes both in real time, clamped 20–80%
+  - "Download PDF" in top bar: captures `previewRef.current.innerHTML` → sends to `/api/html-to-pdf` → PDF = exactly what user sees in preview
 
 _This section is updated at the end of every phase._
 
