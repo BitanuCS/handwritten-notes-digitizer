@@ -109,16 +109,37 @@ Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bi
 - **`frontend/src/lib/api.ts`** — `htmlToPdf(innerHtml, theme)` → blob URL.
 
 ### Key architecture decisions (important for Phase 5+)
-- `FlowItem` in `layout.py` now carries `color_hex: str | None` — set by `colorize()`.
-- `colorize(page, theme)` in `colorize.py` returns `dict[int, str]` mapping color_group → hex.
-  8-color palettes: `_WHITE_PALETTE` / `_BLACK_PALETTE`. Groups sorted by id for stability.
-- Templates (`a4_white.html`, `a4_black.html`) inject `color: {{ item.color_hex }};` inline
-  when present; falls back to the body default color otherwise.
-- Frontend preview: `buildBlockColors(result, theme)` computes a `string[]` (one color per
-  text block). `renderPreviewHtml(text, blockColors)` wraps each paragraph (split on `\n\n`)
-  in `<span style="color:…">` when a color is assigned. `blockColors` is a `useMemo` on `result`.
-- PDF export captures `previewRef.current.innerHTML` — inline color styles come through
-  automatically; no changes needed to the html-to-pdf pipeline.
+- `FlowItem` now carries `color: str | None` (resolved hex) and `svg: str | None` (diagram SVG).
+- `enrich_pages(pages, theme)` in `layout.py` populates `block.svg` in-place before returning
+  `ConvertResponse` — the frontend preview uses these SVG strings directly.
+- `buildPreviewHtml(result, editedText, theme)` in `result/page.tsx` interleaves colored text
+  blocks and SVG diagram blocks sorted by y. `COLOR_PALETTES` mirrors `_PALETTES` in `colorize.py`.
+
+## Phase 4 — Colorization + Diagram Rendering
+
+### What was built
+- **`backend/app/services/colorize.py`** — `colorize(page, theme) → dict[group_id → hex]`.
+  Two 8-color palettes (`PageTheme.white` / `PageTheme.black`). Groups cycle with `(id-1) % 8`.
+  Collects color_groups from both text blocks and diagram shape interiors.
+- **`backend/app/services/diagrams.py`** — `diagram_to_svg(block, colors, theme) → str`.
+  Renders `diagram_data.shapes` (box/rounded_box/diamond/circle/ellipse) and `diagram_data.arrows`
+  as inline SVG. Shape boxes are normalized 0..1 relative to the diagram's own bounding box.
+  SVG width = `block.box.w * 100%` so position is proportionally preserved on the page.
+- **`backend/app/schemas/notes.py`** — added `DiagramShape`, `DiagramArrow`, `DiagramData`
+  models; `Block` gains `diagram_data: DiagramData | None` and `svg: str | None`.
+- **`backend/app/services/layout.py`** — `FlowItem` gains `color` + `svg`; `_build_flow_items`
+  now includes diagram blocks; `enrich_pages(pages, theme)` computes SVGs in-place before
+  returning `ConvertResponse`.
+- **`backend/app/templates/a4_white.html`** / **`a4_black.html`** — block loop branches:
+  `item.svg` → `{{ item.svg | safe }}`; else `style="color: {{ item.color }}"`.
+- **`backend/app/prompts/extract_notes.txt`** — rule 5 updated: diagram blocks now include
+  `diagram_data` with shapes (kind/box/text/color_group) and arrows (from_id/to_id/label).
+- **`frontend/src/types/notes.ts`** — `DiagramShape`, `DiagramArrow`, `DiagramData` types;
+  `Block` updated with `diagram_data` and `svg` fields.
+- **`frontend/src/app/app/result/page.tsx`** — `COLOR_PALETTES` constant (mirrors backend);
+  `buildPreviewHtml(result, editedText, theme)` interleaves colored text + SVG diagrams sorted
+  by `box.y`. Old `renderPreviewHtml` removed.
+- **`backend/tests/test_diagrams.py`** — 3 unit tests for `diagram_to_svg`.
 
 ## Gotcha log
 - gh CLI: `~/.config` is root-owned → always `export GH_CONFIG_DIR="$HOME/.gh"`.

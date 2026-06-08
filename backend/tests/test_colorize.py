@@ -1,5 +1,5 @@
 from app.schemas.notes import Block, BlockType, Box, Page, PageTheme
-from app.services.colorize import colorize
+from app.services.colorize import _PALETTES, colorize
 
 
 def _block(color_group: int | None) -> Block:
@@ -16,11 +16,10 @@ def test_colorize_no_groups():
     assert colorize(page, PageTheme.white) == {}
 
 
-def test_colorize_groups_are_stable():
+def test_colorize_groups_get_distinct_colors():
     page = Page(blocks=[_block(2), _block(1), _block(2)])
     result = colorize(page, PageTheme.white)
     assert set(result.keys()) == {1, 2}
-    # group 1 comes first (sorted), group 2 second — different colors
     assert result[1] != result[2]
 
 
@@ -32,7 +31,16 @@ def test_colorize_white_vs_black_differ():
 
 
 def test_colorize_palette_wraps():
-    # 9 groups — group 9 should wrap back to palette[0]
+    # Group IDs are 1-based: (g-1) % 8 → group 9 wraps to same color as group 1.
     page = Page(blocks=[_block(i) for i in range(1, 10)])
     result = colorize(page, PageTheme.white)
-    assert result[1] == result[9]  # 8-color palette wraps at index 8 → same as index 0
+    assert result[1] == result[9]
+
+
+def test_colorize_direct_palette_mapping():
+    # Group 1 → index 0, group 2 → index 1.
+    page = Page(blocks=[_block(1), _block(2)])
+    result = colorize(page, PageTheme.white)
+    palette = _PALETTES[PageTheme.white]
+    assert result[1] == palette[0]
+    assert result[2] == palette[1]

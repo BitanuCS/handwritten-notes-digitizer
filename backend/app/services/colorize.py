@@ -1,40 +1,31 @@
 """Colorize service: assign readable colors to blocks by color group (Feature 2).
 
-Related blocks (same color_group) share a color; the palette differs for
-white vs black themes so all colors are readable against their background.
+Palettes are mirrored in frontend/src/app/app/result/page.tsx (COLOR_PALETTES).
+Keep both in sync when changing colors.
 """
 
 from app.schemas.notes import Page, PageTheme
 
-# 8 perceptually-distinct colors, tested for readability on each theme.
-_WHITE_PALETTE = [
-    "#2563eb",  # blue
-    "#16a34a",  # green
-    "#dc2626",  # red
-    "#9333ea",  # purple
-    "#d97706",  # amber
-    "#0891b2",  # cyan
-    "#db2777",  # pink
-    "#65a30d",  # lime
-]
-_BLACK_PALETTE = [
-    "#60a5fa",  # blue-400
-    "#4ade80",  # green-400
-    "#f87171",  # red-400
-    "#c084fc",  # purple-400
-    "#fbbf24",  # amber-400
-    "#22d3ee",  # cyan-400
-    "#f472b6",  # pink-400
-    "#a3e635",  # lime-400
-]
+# 8 distinct colors per theme. Group IDs are 1-based; cycle with (group_id - 1) % 8.
+_PALETTES: dict[PageTheme, list[str]] = {
+    PageTheme.white: [
+        "#e63946", "#2a9d8f", "#e76f51", "#457b9d",
+        "#8338ec", "#2b9348", "#f4a261", "#118ab2",
+    ],
+    PageTheme.black: [
+        "#ff6b6b", "#4ecdc4", "#ffa552", "#74b8e8",
+        "#b77bff", "#56cf72", "#ffd166", "#48cae4",
+    ],
+}
 
 
 def colorize(page: Page, theme: PageTheme) -> dict[int, str]:
-    """Return a mapping from color_group id → hex color for this page/theme.
-
-    Groups are sorted by their first appearance (ascending id) so the mapping
-    is stable across calls with the same page.
-    """
-    palette = _WHITE_PALETTE if theme == PageTheme.white else _BLACK_PALETTE
-    groups = sorted({b.color_group for b in page.blocks if b.color_group is not None})
-    return {g: palette[i % len(palette)] for i, g in enumerate(groups)}
+    """Map each color_group id to a hex color appropriate for the theme."""
+    palette = _PALETTES[theme]
+    groups: set[int] = {b.color_group for b in page.blocks if b.color_group is not None}
+    for b in page.blocks:
+        if b.diagram_data:
+            for s in b.diagram_data.shapes:
+                if s.color_group is not None:
+                    groups.add(s.color_group)
+    return {g: palette[(g - 1) % len(palette)] for g in groups}
