@@ -20,7 +20,7 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later).
 
 ## Current status
-- ✅ Phase 0–3 done. ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 4** (colorization).
+- ✅ Phase 0–4 done. ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 5** (white/black toggle).
 - Repo: https://github.com/BitanuCS/handwritten-notes-digitizer (public, branch `main`).
 - Phase table is in `PROJECT_PLAN.md` → "Progress / Current Status".
 
@@ -108,13 +108,17 @@ Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bi
     `/api/html-to-pdf`. PDF is a literal snapshot of the preview panel — pixel-identical.
 - **`frontend/src/lib/api.ts`** — `htmlToPdf(innerHtml, theme)` → blob URL.
 
-### Key architecture decisions (important for Phase 4)
-- `FlowItem` in `layout.py` already carries `color_group: int | None` — Phase 4 just needs
-  to map groups to CSS colors in the template and the preview renderer.
-- The AI already returns `color_group` per block; the prompt asks for it; Pydantic schema has it.
-- `renderPreviewHtml` renders the preview as plain text (no color). Phase 4 will need a
-  per-line color lookup in the preview too (from the original `ConvertResponse` blocks, which
-  are stored in `result` state alongside `editedText`).
+### Key architecture decisions (important for Phase 5+)
+- `FlowItem` in `layout.py` now carries `color_hex: str | None` — set by `colorize()`.
+- `colorize(page, theme)` in `colorize.py` returns `dict[int, str]` mapping color_group → hex.
+  8-color palettes: `_WHITE_PALETTE` / `_BLACK_PALETTE`. Groups sorted by id for stability.
+- Templates (`a4_white.html`, `a4_black.html`) inject `color: {{ item.color_hex }};` inline
+  when present; falls back to the body default color otherwise.
+- Frontend preview: `buildBlockColors(result, theme)` computes a `string[]` (one color per
+  text block). `renderPreviewHtml(text, blockColors)` wraps each paragraph (split on `\n\n`)
+  in `<span style="color:…">` when a color is assigned. `blockColors` is a `useMemo` on `result`.
+- PDF export captures `previewRef.current.innerHTML` — inline color styles come through
+  automatically; no changes needed to the html-to-pdf pipeline.
 
 ## Gotcha log
 - gh CLI: `~/.config` is root-owned → always `export GH_CONFIG_DIR="$HOME/.gh"`.

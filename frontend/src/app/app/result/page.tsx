@@ -1,13 +1,28 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import katex from "katex";
 
 import { htmlToPdf } from "@/lib/api";
-import type { ConvertResponse, PageTheme } from "@/types/notes";
+import type { ConvertResponse, PageTheme, Block } from "@/types/notes";
 
 type PdfState = "idle" | "loading" | "error";
+
+// ─── Color helpers ────────────────────────────────────────────────────────────
+
+const _WHITE_PALETTE = ["#2563eb","#16a34a","#dc2626","#9333ea","#d97706","#0891b2","#db2777","#65a30d"];
+const _BLACK_PALETTE = ["#60a5fa","#4ade80","#f87171","#c084fc","#fbbf24","#22d3ee","#f472b6","#a3e635"];
+
+function buildBlockColors(result: ConvertResponse, theme: PageTheme): string[] {
+  const palette = theme === "white" ? _WHITE_PALETTE : _BLACK_PALETTE;
+  const blocks: Block[] = result.pages.flatMap((p) => p.blocks.filter((b) => b.text));
+  const groups = [...new Set(
+    blocks.map((b) => b.color_group).filter((g): g is number => g != null)
+  )].sort((a, b) => a - b);
+  const groupToColor = new Map(groups.map((g, i) => [g, palette[i % palette.length]]));
+  return blocks.map((b) => (b.color_group != null ? (groupToColor.get(b.color_group) ?? "") : ""));
+}
 
 // ─── Text helpers ─────────────────────────────────────────────────────────────
 
@@ -55,12 +70,19 @@ function renderWithLatex(text: string): string {
   return escapeHtml(text);
 }
 
-/** Render multi-line text to HTML — each line rendered with KaTeX, joined with <br>. */
-function renderPreviewHtml(text: string): string {
+/** Render text to HTML — paragraphs (separated by blank lines) get color from blockColors. */
+function renderPreviewHtml(text: string, blockColors: string[]): string {
   return text
-    .split("\n")
-    .map((line) => (line.trim() === "" ? "<br/>" : renderWithLatex(line)))
-    .join("<br/>");
+    .split("\n\n")
+    .map((para, i) => {
+      const lines = para
+        .split("\n")
+        .map((line) => (line.trim() === "" ? "<br/>" : renderWithLatex(line)))
+        .join("<br/>");
+      const color = blockColors[i];
+      return color ? `<span style="color:${color}">${lines}</span>` : lines;
+    })
+    .join("<br/><br/>");
 }
 
 function blocksToText(result: ConvertResponse): string {
@@ -78,6 +100,11 @@ export default function ResultPage() {
   const [editedText, setEditedText] = useState("");
   const [pdfState, setPdfState] = useState<PdfState>("idle");
   const [theme] = useState<PageTheme>("white");
+
+  const blockColors = useMemo(
+    () => (result ? buildBlockColors(result, theme) : []),
+    [result, theme],
+  );
 
   // Resizable split: percentage of total width given to the left (edit) panel.
   const [splitPct, setSplitPct] = useState(50);
@@ -241,7 +268,7 @@ export default function ResultPage() {
             <div
               ref={previewRef}
               className="text-sm text-gray-800 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: renderPreviewHtml(editedText) }}
+              dangerouslySetInnerHTML={{ __html: renderPreviewHtml(editedText, blockColors) }}
             />
           </div>
         </div>

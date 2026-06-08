@@ -13,15 +13,15 @@
 | 1 — Landing page | ✅ Done |
 | 2 — Pipeline proof (photo → text) | ✅ Done |
 | 3 — Positioned extraction + A4 PDF | ✅ Done |
-| 4 — Colorization | ⏭️ **Next** |
-| 5 — White/black toggle | ⬜ Pending |
+| 4 — Colorization | ✅ Done |
+| 5 — White/black toggle | ⏭️ **Next** |
 | 6 — Cleanup + dates | ⬜ Pending |
 | 7 — Multi-page | ⬜ Pending |
-| 8 — Review/edit screen | ⚡ Core done (edit+preview+PDF); color tweaking pending |
+| 8 — Review/edit screen | ⚡ Core done (edit+preview+PDF+color) |
 | 9 — Diagrams | ⬜ Pending |
 | 10 — Polish & launch | ⬜ Pending |
 
-**Repo:** https://github.com/BitanuCS/handwritten-notes-digitizer (pushed through Phase 3 + Phase 8 core)
+**Repo:** https://github.com/BitanuCS/handwritten-notes-digitizer (pushed through Phase 4)
 
 ### What was built in the Phase 3 session (more than planned)
 

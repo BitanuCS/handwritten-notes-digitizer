@@ -11,6 +11,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from app.schemas.notes import BlockType, Page, PageTheme
+from app.services.colorize import colorize
 
 _TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 _env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
@@ -29,9 +30,10 @@ class FlowItem:
     text: str
     gap_em: float       # margin-top before this item
     color_group: int | None
+    color_hex: str | None   # resolved hex color, or None for default theme color
 
 
-def _build_flow_items(page: Page) -> list[FlowItem]:
+def _build_flow_items(page: Page, color_map: dict[int, str]) -> list[FlowItem]:
     """Convert one page's blocks into a sorted, gap-annotated list."""
     eligible = [b for b in page.blocks if b.type != BlockType.diagram and b.text]
     eligible.sort(key=lambda b: (b.box.y, b.box.x))
@@ -49,6 +51,7 @@ def _build_flow_items(page: Page) -> list[FlowItem]:
             text=block.text,  # type: ignore[arg-type]
             gap_em=gap_em,
             color_group=block.color_group,
+            color_hex=color_map.get(block.color_group) if block.color_group is not None else None,
         ))
     return items
 
@@ -56,7 +59,8 @@ def _build_flow_items(page: Page) -> list[FlowItem]:
 def render_html(pages: list[Page], theme: PageTheme) -> str:
     """Render structured pages into a single A4 HTML document."""
     tmpl = _env.get_template(f"a4_{theme.value}.html")
-    flow_pages = [_build_flow_items(p) for p in pages]
+    color_maps = [colorize(p, theme) for p in pages]
+    flow_pages = [_build_flow_items(p, color_maps[i]) for i, p in enumerate(pages)]
     return tmpl.render(pages=pages, flow_pages=flow_pages)
 
 

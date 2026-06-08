@@ -52,7 +52,7 @@
     {% for item in flow_pages[i] %}
     <div
       class="block{% if item.block_type == 'equation' %} block-equation{% endif %}"
-      style="margin-top: {{ '%.2f'|format(item.gap_em) }}em;"
+      style="margin-top: {{ '%.2f'|format(item.gap_em) }}em;{% if item.color_hex %} color: {{ item.color_hex }};{% endif %}"
     >{{ item.text }}</div>
     {% endfor %}
   </div>
