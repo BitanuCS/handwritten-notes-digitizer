@@ -12,11 +12,32 @@ export interface Box {
   h: number;
 }
 
+export interface DiagramShape {
+  id: string;
+  kind: string;  // "box" | "rounded_box" | "diamond" | "circle" | "ellipse"
+  box: Box;      // 0..1 relative to the diagram block's own bounding box
+  text: string;
+  color_group?: number | null;
+}
+
+export interface DiagramArrow {
+  from_id: string;
+  to_id: string;
+  label: string;
+}
+
+export interface DiagramData {
+  shapes: DiagramShape[];
+  arrows: DiagramArrow[];
+}
+
 export interface Block {
   type: BlockType;
   box: Box;
   text?: string | null;
   color_group?: number | null;
+  diagram_data?: DiagramData | null;   // for diagram blocks (from AI)
+  svg?: string | null;                 // computed by backend, not from AI
 }
 
 export interface Page {

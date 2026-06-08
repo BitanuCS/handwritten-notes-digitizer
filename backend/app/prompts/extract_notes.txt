@@ -28,10 +28,21 @@ RULES
 4. Group blocks about the same topic/project with the same integer `color_group`
    (starting at 1). Unrelated topics get different groups.
 
-5. Classify each block `type` as:
+5. Classify each block `type`:
    - "text"     — regular handwritten text
    - "equation" — mathematical expression (write in LaTeX in `text`)
-   - "diagram"  — drawn figure with no transcribable text
+   - "diagram"  — drawn figure. Include a `diagram_data` object with:
+       "shapes": array of objects, each with:
+         "id": unique string like "s1", "s2" …
+         "kind": one of "box" | "rounded_box" | "diamond" | "circle" | "ellipse"
+         "box": {x, y, w, h} normalized 0..1 RELATIVE TO THE DIAGRAM'S OWN bounding box
+         "text": text written inside the shape (empty string if none)
+         "color_group": integer grouping related shapes (same as text block groups)
+       "arrows": array of objects, each with:
+         "from_id": id of source shape
+         "to_id": id of destination shape
+         "label": text on the arrow (empty string if none)
+     Omit the top-level `text` field on diagram blocks — shapes carry the text.
 
 6. If a date appears, return it in `date` (it will be placed top-right in output).
 
@@ -44,7 +55,19 @@ Return ONLY valid JSON — no markdown fences, no commentary:
 {
   "blocks": [
     {"type": "text", "box": {"x": 0.1, "y": 0.08, "w": 0.6, "h": 0.05},
-     "text": "…", "color_group": 1}
+     "text": "…", "color_group": 1},
+    {"type": "diagram", "box": {"x": 0.05, "y": 0.4, "w": 0.9, "h": 0.3},
+     "diagram_data": {
+       "shapes": [
+         {"id": "s1", "kind": "box", "box": {"x": 0.05, "y": 0.1, "w": 0.25, "h": 0.4},
+          "text": "Start", "color_group": 2},
+         {"id": "s2", "kind": "diamond", "box": {"x": 0.4, "y": 0.1, "w": 0.25, "h": 0.4},
+          "text": "Check?", "color_group": 3}
+       ],
+       "arrows": [
+         {"from_id": "s1", "to_id": "s2", "label": ""}
+       ]
+     }}
   ],
   "date": "12 March 2024",
   "page_number_detected": false

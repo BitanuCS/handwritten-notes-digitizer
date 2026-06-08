@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.schemas.notes import ConvertResponse, Page, PageTheme
-from app.services.layout import render_html, wrap_preview_html
+from app.services.layout import enrich_pages, render_html, wrap_preview_html
 from app.services.pdf import html_to_pdf
 from app.services.vision import extract_page
 
@@ -42,6 +42,7 @@ async def convert(
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         pages.append(page)
+    enrich_pages(pages, theme)
     return ConvertResponse(pages=pages)
 
 
@@ -61,6 +62,7 @@ async def convert_to_pdf(
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         pages.append(page)
 
+    enrich_pages(pages, theme)
     html = render_html(pages, theme)
     try:
         pdf_bytes = await html_to_pdf(html)

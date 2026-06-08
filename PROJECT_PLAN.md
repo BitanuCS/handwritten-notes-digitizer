@@ -13,8 +13,8 @@
 | 1 — Landing page | ✅ Done |
 | 2 — Pipeline proof (photo → text) | ✅ Done |
 | 3 — Positioned extraction + A4 PDF | ✅ Done |
-| 4 — Colorization | ⏭️ **Next** |
-| 5 — White/black toggle | ⬜ Pending |
+| 4 — Colorization | ✅ Done |
+| 5 — White/black toggle | ⏭️ **Next** |
 | 6 — Cleanup + dates | ⬜ Pending |
 | 7 — Multi-page | ⬜ Pending |
 | 8 — Review/edit screen | ⚡ Core done (edit+preview+PDF); color tweaking pending |

@@ -11,6 +11,8 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from app.schemas.notes import BlockType, Page, PageTheme
+from app.services.colorize import colorize
+from app.services.diagrams import diagram_to_svg
 
 _TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 _env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
@@ -27,13 +29,20 @@ _MAX_GAP_EM = 3.0
 class FlowItem:
     block_type: BlockType
     text: str
-    gap_em: float       # margin-top before this item
+    gap_em: float           # margin-top before this item
     color_group: int | None
+    color: str | None       # resolved hex color for text blocks
+    svg: str | None         # SVG markup for diagram blocks
 
 
-def _build_flow_items(page: Page) -> list[FlowItem]:
+def _build_flow_items(
+    page: Page, colors: dict[int, str], theme: PageTheme
+) -> list[FlowItem]:
     """Convert one page's blocks into a sorted, gap-annotated list."""
-    eligible = [b for b in page.blocks if b.type != BlockType.diagram and b.text]
+    eligible = [
+        b for b in page.blocks
+        if (b.type != BlockType.diagram and b.text) or b.type == BlockType.diagram
+    ]
     eligible.sort(key=lambda b: (b.box.y, b.box.x))
 
     items: list[FlowItem] = []
@@ -44,19 +53,45 @@ def _build_flow_items(page: Page) -> list[FlowItem]:
             prev = eligible[i - 1]
             raw = (block.box.y - prev.box.y) * _PAGE_HEIGHT_EM
             gap_em = min(max(raw, 0.0), _MAX_GAP_EM)
-        items.append(FlowItem(
-            block_type=block.type,
-            text=block.text,  # type: ignore[arg-type]
-            gap_em=gap_em,
-            color_group=block.color_group,
-        ))
+
+        if block.type == BlockType.diagram:
+            items.append(FlowItem(
+                block_type=block.type,
+                text="",
+                gap_em=gap_em,
+                color_group=None,
+                color=None,
+                svg=diagram_to_svg(block, colors, theme),
+            ))
+        else:
+            items.append(FlowItem(
+                block_type=block.type,
+                text=block.text,  # type: ignore[arg-type]
+                gap_em=gap_em,
+                color_group=block.color_group,
+                color=colors.get(block.color_group) if block.color_group else None,
+                svg=None,
+            ))
     return items
+
+
+def enrich_pages(pages: list[Page], theme: PageTheme) -> None:
+    """Populate block.svg for all diagram blocks in-place.
+
+    Called before returning ConvertResponse so the frontend preview can use
+    the pre-computed SVG strings directly.
+    """
+    for page in pages:
+        c = colorize(page, theme)
+        for block in page.blocks:
+            if block.type == BlockType.diagram and block.diagram_data:
+                block.svg = diagram_to_svg(block, c, theme)
 
 
 def render_html(pages: list[Page], theme: PageTheme) -> str:
     """Render structured pages into a single A4 HTML document."""
     tmpl = _env.get_template(f"a4_{theme.value}.html")
-    flow_pages = [_build_flow_items(p) for p in pages]
+    flow_pages = [_build_flow_items(p, colorize(p, theme), theme) for p in pages]
     return tmpl.render(pages=pages, flow_pages=flow_pages)
 
 

@@ -20,7 +20,7 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later).
 
 ## Current status
-- ✅ Phase 0–3 done. ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 4** (colorization).
+- ✅ Phase 0–4 done. ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 5** (white/black toggle).
 - Repo: https://github.com/BitanuCS/handwritten-notes-digitizer (public, branch `main`).
 - Phase table is in `PROJECT_PLAN.md` → "Progress / Current Status".
 
@@ -108,13 +108,38 @@ Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bi
     `/api/html-to-pdf`. PDF is a literal snapshot of the preview panel — pixel-identical.
 - **`frontend/src/lib/api.ts`** — `htmlToPdf(innerHtml, theme)` → blob URL.
 
-### Key architecture decisions (important for Phase 4)
-- `FlowItem` in `layout.py` already carries `color_group: int | None` — Phase 4 just needs
-  to map groups to CSS colors in the template and the preview renderer.
-- The AI already returns `color_group` per block; the prompt asks for it; Pydantic schema has it.
-- `renderPreviewHtml` renders the preview as plain text (no color). Phase 4 will need a
-  per-line color lookup in the preview too (from the original `ConvertResponse` blocks, which
-  are stored in `result` state alongside `editedText`).
+### Key architecture decisions (important for Phase 5+)
+- `FlowItem` now carries `color: str | None` (resolved hex) and `svg: str | None` (diagram SVG).
+- `enrich_pages(pages, theme)` in `layout.py` populates `block.svg` in-place before returning
+  `ConvertResponse` — the frontend preview uses these SVG strings directly.
+- `buildPreviewHtml(result, editedText, theme)` in `result/page.tsx` replaces the old
+  `renderPreviewHtml(text)` — it interleaves colored text blocks and SVG diagram blocks sorted by y.
+
+## Phase 4 — Colorization + Diagram Rendering
+
+### What was built
+- **`backend/app/services/colorize.py`** — `colorize(page, theme) → dict[group_id → hex]`.
+  Two 8-color palettes (`PageTheme.white` / `PageTheme.black`). Groups cycle with `(id-1) % 8`.
+  Collects color_groups from both text blocks and diagram shape interiors.
+- **`backend/app/services/diagrams.py`** — `diagram_to_svg(block, colors, theme) → str`.
+  Renders `diagram_data.shapes` (box/rounded_box/diamond/circle/ellipse) and `diagram_data.arrows`
+  as inline SVG. Shape boxes are normalized 0..1 relative to the diagram's own bounding box.
+  SVG width = `block.box.w * 100%` so position is proportionally preserved on the page.
+- **`backend/app/schemas/notes.py`** — added `DiagramShape`, `DiagramArrow`, `DiagramData`
+  models; `Block` gains `diagram_data: DiagramData | None` and `svg: str | None`.
+- **`backend/app/services/layout.py`** — `FlowItem` gains `color` + `svg`; `_build_flow_items`
+  now includes diagram blocks; `enrich_pages(pages, theme)` computes SVGs in-place before
+  returning `ConvertResponse`.
+- **`backend/app/templates/a4_white.html`** / **`a4_black.html`** — block loop branches:
+  `item.svg` → `{{ item.svg | safe }}`; else `style="color: {{ item.color }}"`.
+- **`backend/app/prompts/extract_notes.txt`** — rule 5 updated: diagram blocks now include
+  `diagram_data` with shapes (kind/box/text/color_group) and arrows (from_id/to_id/label).
+- **`frontend/src/types/notes.ts`** — `DiagramShape`, `DiagramArrow`, `DiagramData` types;
+  `Block` updated with `diagram_data` and `svg` fields.
+- **`frontend/src/app/app/result/page.tsx`** — `COLOR_PALETTES` constant (mirrors backend);
+  `buildPreviewHtml(result, editedText, theme)` interleaves colored text + SVG diagrams sorted
+  by `box.y`. Old `renderPreviewHtml` removed.
+- **`backend/tests/test_diagrams.py`** — 3 unit tests for `diagram_to_svg`.
 
 ## Gotcha log
 - gh CLI: `~/.config` is root-owned → always `export GH_CONFIG_DIR="$HOME/.gh"`.

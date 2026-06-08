@@ -50,10 +50,14 @@
   <div class="page">
     {% if pages[i].date %}<div class="date">{{ pages[i].date }}</div>{% endif %}
     {% for item in flow_pages[i] %}
+    {% if item.svg %}
+    <div style="margin-top: {{ '%.2f'|format(item.gap_em) }}em;">{{ item.svg | safe }}</div>
+    {% else %}
     <div
       class="block{% if item.block_type == 'equation' %} block-equation{% endif %}"
-      style="margin-top: {{ '%.2f'|format(item.gap_em) }}em;"
+      style="margin-top: {{ '%.2f'|format(item.gap_em) }}em;{% if item.color %} color: {{ item.color }};{% endif %}"
     >{{ item.text }}</div>
+    {% endif %}
     {% endfor %}
   </div>
   {% endfor %}

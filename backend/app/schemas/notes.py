@@ -31,11 +31,32 @@ class Box(BaseModel):
     h: float
 
 
+class DiagramShape(BaseModel):
+    id: str
+    kind: str                        # "box", "rounded_box", "diamond", "circle", "ellipse"
+    box: Box                         # 0..1 relative to the diagram block's own bounding box
+    text: str = ""
+    color_group: int | None = None
+
+
+class DiagramArrow(BaseModel):
+    from_id: str
+    to_id: str
+    label: str = ""
+
+
+class DiagramData(BaseModel):
+    shapes: list[DiagramShape] = []
+    arrows: list[DiagramArrow] = []
+
+
 class Block(BaseModel):
     type: BlockType
     box: Box
     text: str | None = None          # for text / equation blocks
     color_group: int | None = None   # related blocks share a color group
+    diagram_data: DiagramData | None = None   # for diagram blocks (from AI)
+    svg: str | None = None                    # computed by backend, not from AI
 
 
 class Page(BaseModel):

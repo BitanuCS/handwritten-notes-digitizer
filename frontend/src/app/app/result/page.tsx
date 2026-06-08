@@ -11,6 +11,12 @@ type PdfState = "idle" | "loading" | "error";
 
 // ─── Text helpers ─────────────────────────────────────────────────────────────
 
+// Color palettes — must match backend/app/services/colorize.py (_PALETTES).
+const COLOR_PALETTES: Record<PageTheme, string[]> = {
+  white: ["#e63946", "#2a9d8f", "#e76f51", "#457b9d", "#8338ec", "#2b9348", "#f4a261", "#118ab2"],
+  black: ["#ff6b6b", "#4ecdc4", "#ffa552", "#74b8e8", "#b77bff", "#56cf72", "#ffd166", "#48cae4"],
+};
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -55,12 +61,51 @@ function renderWithLatex(text: string): string {
   return escapeHtml(text);
 }
 
-/** Render multi-line text to HTML — each line rendered with KaTeX, joined with <br>. */
-function renderPreviewHtml(text: string): string {
-  return text
-    .split("\n")
-    .map((line) => (line.trim() === "" ? "<br/>" : renderWithLatex(line)))
-    .join("<br/>");
+/**
+ * Build preview HTML from the full result + current edited text.
+ *
+ * Blocks are sorted by their page y-coordinate. Text blocks are colored by
+ * color_group. Diagram blocks are embedded as SVG (pre-computed by the backend).
+ * editedText is split by "\n\n" and matched back to text blocks by index.
+ */
+function buildPreviewHtml(
+  result: ConvertResponse,
+  editedText: string,
+  theme: PageTheme,
+): string {
+  const palette = COLOR_PALETTES[theme];
+
+  const allBlocks = result.pages
+    .flatMap((p) => p.blocks)
+    .sort((a, b) => a.box.y - b.box.y);
+
+  const textChunks = editedText.split("\n\n");
+  let textIdx = 0;
+  const items: Array<{ y: number; html: string }> = [];
+
+  for (const block of allBlocks) {
+    if (block.type === "diagram") {
+      if (block.svg) {
+        items.push({ y: block.box.y, html: block.svg });
+      }
+    } else if (block.text) {
+      const chunk = textChunks[textIdx] ?? "";
+      textIdx++;
+      const color = block.color_group != null
+        ? palette[(block.color_group - 1) % palette.length]
+        : null;
+      const rendered = chunk
+        .split("\n")
+        .map((line) => {
+          const lineHtml = line.trim() === "" ? "<br/>" : renderWithLatex(line);
+          return color ? `<span style="color:${color}">${lineHtml}</span>` : lineHtml;
+        })
+        .join("<br/>");
+      items.push({ y: block.box.y, html: `<div>${rendered}</div>` });
+    }
+  }
+
+  return items.map((i) => i.html).join("\n");
 }
 
 function blocksToText(result: ConvertResponse): string {
@@ -241,7 +286,7 @@ export default function ResultPage() {
             <div
               ref={previewRef}
               className="text-sm text-gray-800 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: renderPreviewHtml(editedText) }}
+              dangerouslySetInnerHTML={{ __html: result ? buildPreviewHtml(result, editedText, theme) : "" }}
             />
           </div>
         </div>
