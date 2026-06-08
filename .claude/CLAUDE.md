@@ -20,9 +20,26 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later).
 
 ## Current status
-- ✅ Phase 0–4 done. ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 5** (white/black toggle).
+- ✅ Phase 0–4 done. ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 4.1** (fix diagram rendering — see bug below).
 - Repo: https://github.com/BitanuCS/handwritten-notes-digitizer (public, branch `main`).
 - Phase table is in `PROJECT_PLAN.md` → "Progress / Current Status".
+
+## Known bug: diagrams not rendering (Phase 4.1 task)
+Root cause: AI (Groq Llama 4 Scout) returns `type: "diagram"` blocks but does NOT populate
+`diagram_data` with shapes/arrows. `enrich_pages()` in `layout.py` guards on
+`block.diagram_data is not None` — so no SVG is generated and the block disappears silently.
+
+Diagnosis:
+- `vision.py:53` does `Page(**data)`. Pydantic defaults `diagram_data=None` when AI omits it.
+- `enrich_pages()` skips blocks where `diagram_data` is None → `block.svg` stays None.
+- Frontend `buildPreviewHtml()` skips `diagram` blocks with no `svg` — no fallback, just gone.
+
+Fix approaches to explore in Phase 4.1:
+1. Fall back to a placeholder box/label when `diagram_data` is None (simple, always renders).
+2. Two-pass AI: first pass extracts text blocks; if a diagram is detected, a second targeted
+   prompt asks the AI to describe only that cropped region as shapes/arrows.
+3. Relax Pydantic validation so a partial `diagram_data` (missing shapes) still produces
+   a minimal SVG placeholder.
 
 ## How to run
 Paths contain a space — always quote them. Homebrew tools at `/opt/homebrew/bin`.
