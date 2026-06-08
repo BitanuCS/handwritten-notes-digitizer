@@ -40,8 +40,8 @@ class DiagramShape(BaseModel):
 
 
 class DiagramArrow(BaseModel):
-    from_id: str
-    to_id: str
+    from_id: str | None = None   # tolerant: the LLM first pass sometimes emits null
+    to_id: str | None = None
     label: str = ""
 
 
@@ -56,6 +56,7 @@ class Block(BaseModel):
     text: str | None = None          # for text / equation blocks
     color_group: int | None = None   # related blocks share a color group
     diagram_data: DiagramData | None = None   # for diagram blocks (from AI)
+    diagram_image: str | None = None          # base64 JPEG crop of the diagram region (photocopy)
     svg: str | None = None                    # computed by backend, not from AI
 
 

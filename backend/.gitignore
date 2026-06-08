@@ -1,0 +1,9 @@
+# YOLO model weights — produced by notebooks/train_flowchart_yolo.ipynb (Colab)
+# and base checkpoints downloaded by ultralytics. Kept out of git (large/binary).
+*.pt
+models/*.pt
+
+# Local debug artifacts and private inputs (handwritten note photos)
+sample_diagram.jpg
+sample_*.png
+sample_output.pdf

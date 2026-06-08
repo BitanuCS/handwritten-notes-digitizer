@@ -15,6 +15,7 @@
 | 3 — Positioned extraction + A4 PDF | ✅ Done |
 | 4 — Colorization | ✅ Done |
 | 4.1 — Diagram rendering fix (two-pass extraction) | ✅ Done |
+| 4.2 — Diagram positions: YOLO detector + hybrid photo-embed routing | ✅ Done |
 | 5 — White/black toggle | ⏭️ **Next** |
 | 6 — Cleanup + dates | ⬜ Pending |
 | 7 — Multi-page | ⬜ Pending |

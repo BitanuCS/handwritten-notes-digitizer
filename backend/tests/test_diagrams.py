@@ -1,8 +1,25 @@
 """Tests for diagram_to_svg."""
 
 from app.schemas.notes import Block, BlockType, Box, DiagramArrow, DiagramData, DiagramShape
-from app.services.diagrams import diagram_to_svg
+from app.services.diagrams import _fit_text, diagram_to_svg
 from app.schemas.notes import PageTheme
+
+
+def test_fit_text_wraps_and_scales():
+    lines, fs = _fit_text("Framework Knowledge Base", w=20.0, h=20.0)
+    assert lines and all(isinstance(line, str) for line in lines)
+    assert 1.3 <= fs <= 3.5
+    assert _fit_text("   ", 20.0, 20.0) == ([], 3.5)
+
+
+def test_image_svg_used_when_diagram_image_present():
+    block = Block(
+        type=BlockType.diagram,
+        box=Box(x=0.1, y=0.2, w=0.6, h=0.4),
+        diagram_image="QUJD",  # base64 'ABC'
+    )
+    svg = diagram_to_svg(block, {}, PageTheme.white)
+    assert "<image" in svg and "data:image/jpeg;base64,QUJD" in svg
 
 
 def _make_block() -> Block:

@@ -1,0 +1,9 @@
+You are reading ONE small cropped region cut from a hand-drawn diagram (a single
+box, circle, diamond, or similar shape). Transcribe ONLY the handwritten text
+written inside this region, exactly as written.
+
+RULES
+- Return ONLY the raw text — no quotes, no labels, no explanation.
+- Fix only obvious handwriting ambiguity (e.g. 'l' vs '1'); never reword.
+- If the region contains no readable text, return an empty string.
+- Keep it short; this is a shape label, usually one or a few words.

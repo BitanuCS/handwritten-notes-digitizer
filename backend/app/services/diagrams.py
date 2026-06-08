@@ -5,9 +5,25 @@ are normalized 0..1 relative to the diagram block's own bounding box.
 The SVG width mirrors the diagram's page-relative width so position is preserved.
 """
 
+import textwrap
+from html import escape as _esc
+
 from app.schemas.notes import Block, PageTheme
 
 _ARROW_COLORS = {PageTheme.white: "#888888", PageTheme.black: "#aaaaaa"}
+
+
+def _fit_text(text: str, w: float, h: float) -> tuple[list[str], float]:
+    """Wrap `text` to the shape box and pick a font size that fits (viewBox units)."""
+    raw = " ".join(text.split())
+    if not raw:
+        return [], 3.5
+    budget = max(5, int(w / 1.8))            # chars per line for this box width
+    lines = textwrap.wrap(raw, width=budget) or [raw]
+    longest = max(len(line) for line in lines)
+    fs_w = (w * 1.7) / max(longest, 1)       # fit widest line
+    fs_h = (h * 0.85) / (len(lines) * 1.2)   # fit all lines vertically
+    return lines, max(1.3, min(3.5, fs_w, fs_h))
 
 
 def _placeholder_svg(block: Block, theme: PageTheme) -> str:
@@ -35,12 +51,38 @@ def _placeholder_svg(block: Block, theme: PageTheme) -> str:
     )
 
 
-def diagram_to_svg(block: Block, colors: dict[int, str], theme: PageTheme) -> str:
-    """Convert a diagram block's shapes + arrows into an inline SVG string.
+def _image_svg(block: Block) -> str:
+    """Embed the cropped diagram photo inside an SVG at its original page width.
 
-    Falls back to a labeled placeholder box when the block has no extractable
-    shapes, so a detected diagram is never silently dropped from the output.
+    Wrapping the photo in an SVG (rather than a bare <img>) lets it flow through
+    the exact same `block.svg` render path as vector diagrams — no template or
+    frontend branching needed. Width mirrors the diagram's page-relative width so
+    its position/scale on the A4 page matches the original.
     """
+    bw = block.box.w
+    bh = block.box.h
+    vw = 100.0
+    vh = (bh / bw * 100.0) if bw > 0 else 75.0
+    href = f"data:image/jpeg;base64,{block.diagram_image}"
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'viewBox="0 0 {vw:.1f} {vh:.1f}" '
+        f'style="width:{bw * 100:.1f}%;height:auto;display:block;margin:0.5em 0">'
+        f'<image href="{href}" x="0" y="0" width="{vw:.1f}" height="{vh:.1f}" '
+        f'preserveAspectRatio="xMidYMid meet"/>'
+        f'</svg>'
+    )
+
+
+def diagram_to_svg(block: Block, colors: dict[int, str], theme: PageTheme) -> str:
+    """Convert a diagram block into an inline SVG string.
+
+    Priority: embedded cropped photo (faithful position) → vector shapes/arrows →
+    labeled placeholder, so a detected diagram is never silently dropped.
+    """
+    if block.diagram_image:
+        return _image_svg(block)
+
     data = block.diagram_data
     if not data or not data.shapes:
         return _placeholder_svg(block, theme)
@@ -81,7 +123,7 @@ def diagram_to_svg(block: Block, colors: dict[int, str], theme: PageTheme) -> st
             my = (fy + ty) / 2
             parts.append(
                 f'<text x="{mx:.1f}" y="{my:.1f}" font-size="3" '
-                f'text-anchor="middle" fill="{arrow_color}">{arrow.label}</text>'
+                f'text-anchor="middle" fill="{arrow_color}">{_esc(arrow.label)}</text>'
             )
 
     # Shapes.
@@ -120,10 +162,15 @@ def diagram_to_svg(block: Block, colors: dict[int, str], theme: PageTheme) -> st
             )
 
         if shape.text:
+            lines, fs = _fit_text(shape.text, w, h)
+            y0 = cy - (len(lines) - 1) * fs * 0.6
+            tspans = "".join(
+                f'<tspan x="{cx:.1f}" y="{y0 + i * fs * 1.2:.1f}">{_esc(line)}</tspan>'
+                for i, line in enumerate(lines)
+            )
             parts.append(
-                f'<text x="{cx:.1f}" y="{cy:.1f}" font-size="3.5" '
-                f'text-anchor="middle" dominant-baseline="middle" fill="{color}">'
-                f'{shape.text}</text>'
+                f'<text text-anchor="middle" dominant-baseline="middle" '
+                f'font-size="{fs:.2f}" fill="{color}">{tspans}</text>'
             )
 
     parts.append("</svg>")

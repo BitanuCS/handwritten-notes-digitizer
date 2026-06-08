@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import katex from "katex";
 
 import { htmlToPdf } from "@/lib/api";
-import type { ConvertResponse, PageTheme } from "@/types/notes";
+import type { Block, Box, ConvertResponse, PageTheme } from "@/types/notes";
 
 type PdfState = "idle" | "loading" | "error";
 
@@ -16,6 +16,17 @@ const COLOR_PALETTES: Record<PageTheme, string[]> = {
   white: ["#e63946", "#2a9d8f", "#e76f51", "#457b9d", "#8338ec", "#2b9348", "#f4a261", "#118ab2"],
   black: ["#ff6b6b", "#4ecdc4", "#ffa552", "#74b8e8", "#b77bff", "#56cf72", "#ffd166", "#48cae4"],
 };
+
+// A text block whose center falls inside a diagram region is already shown by the
+// diagram (photo crop or labeled shapes) — suppress it to avoid duplication.
+// Mirrors _center_inside_diagram in backend/app/services/layout.py.
+function centerInsideDiagram(block: Block, diagramBoxes: Box[]): boolean {
+  const cx = block.box.x + block.box.w / 2;
+  const cy = block.box.y + block.box.h / 2;
+  return diagramBoxes.some(
+    (d) => d.x <= cx && cx <= d.x + d.w && d.y <= cy && cy <= d.y + d.h,
+  );
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -78,6 +89,10 @@ function buildPreviewHtml(
   const allBlocks = result.pages
     .flatMap((p) => p.blocks)
     .sort((a, b) => a.box.y - b.box.y);
+  const diagramBoxes = result.pages
+    .flatMap((p) => p.blocks)
+    .filter((b) => b.type === "diagram")
+    .map((b) => b.box);
 
   const textChunks = editedText.split("\n\n");
   let textIdx = 0;
@@ -89,6 +104,7 @@ function buildPreviewHtml(
         items.push({ y: block.box.y, html: block.svg });
       }
     } else if (block.text) {
+      if (centerInsideDiagram(block, diagramBoxes)) continue;  // shown by the diagram
       const chunk = textChunks[textIdx] ?? "";
       textIdx++;
       const color = block.color_group != null
@@ -109,8 +125,14 @@ function buildPreviewHtml(
 }
 
 function blocksToText(result: ConvertResponse): string {
+  const diagramBoxes = result.pages
+    .flatMap((p) => p.blocks)
+    .filter((b) => b.type === "diagram")
+    .map((b) => b.box);
   return result.pages
-    .flatMap((p) => p.blocks.filter((b) => b.text).map((b) => b.text!))
+    .flatMap((p) => p.blocks)
+    .filter((b) => b.text && b.type !== "diagram" && !centerInsideDiagram(b, diagramBoxes))
+    .map((b) => b.text!)
     .join("\n\n");
 }
 

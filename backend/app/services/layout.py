@@ -10,7 +10,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from app.schemas.notes import BlockType, Page, PageTheme
+from app.schemas.notes import Block, BlockType, Box, Page, PageTheme
 from app.services.colorize import colorize
 from app.services.diagrams import diagram_to_svg
 
@@ -35,13 +35,28 @@ class FlowItem:
     svg: str | None         # SVG markup for diagram blocks
 
 
+def _center_inside_diagram(block: Block, diagram_boxes: list[Box]) -> bool:
+    """True if a text block's center falls inside any diagram block's box.
+
+    Such text is already shown by the diagram (photo crop or labeled shapes), so
+    rendering it again as a separate line would duplicate the content.
+    """
+    cx = block.box.x + block.box.w / 2
+    cy = block.box.y + block.box.h / 2
+    return any(
+        d.x <= cx <= d.x + d.w and d.y <= cy <= d.y + d.h for d in diagram_boxes
+    )
+
+
 def _build_flow_items(
     page: Page, colors: dict[int, str], theme: PageTheme
 ) -> list[FlowItem]:
     """Convert one page's blocks into a sorted, gap-annotated list."""
+    diagram_boxes = [b.box for b in page.blocks if b.type == BlockType.diagram]
     eligible = [
         b for b in page.blocks
-        if (b.type != BlockType.diagram and b.text) or b.type == BlockType.diagram
+        if b.type == BlockType.diagram
+        or (b.text and not _center_inside_diagram(b, diagram_boxes))
     ]
     eligible.sort(key=lambda b: (b.box.y, b.box.x))
 

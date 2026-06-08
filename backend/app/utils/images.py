@@ -40,13 +40,17 @@ def prepare_image(data: bytes, rotate_deg: int = 0) -> tuple[bytes, str]:
     return buf.getvalue(), "image/jpeg"
 
 
-def crop_normalized(data: bytes, box: Box, pad: float = 0.02) -> bytes:
+def crop_normalized(
+    data: bytes, box: Box, pad: float = 0.02, max_dim: int | None = None
+) -> bytes:
     """Crop a normalized 0..1 region out of an already-corrected page image.
 
-    Used by the two-pass diagram extractor: `data` is the orientation-corrected
-    bytes the vision model already saw, so `box` (the diagram block's page box)
-    maps directly to pixels. A small `pad` is added on each side so shapes near
-    the edge of the AI's bounding box are not clipped. Returns JPEG bytes.
+    Used by the two-pass diagram extractor and the cropped-photo embed: `data` is
+    the orientation-corrected bytes the vision model already saw, so `box` (the
+    diagram block's page box) maps directly to pixels. A small `pad` is added on
+    each side so shapes near the edge of the AI's bounding box are not clipped.
+    If `max_dim` is given, the crop is downscaled so its longest side is at most
+    that many pixels (keeps an embedded base64 payload small). Returns JPEG bytes.
     """
     img = Image.open(io.BytesIO(data))
     if img.mode in ("RGBA", "P"):
@@ -61,6 +65,8 @@ def crop_normalized(data: bytes, box: Box, pad: float = 0.02) -> bytes:
     crop = img.crop(
         (int(left * w), int(top * h), int(right * w), int(bottom * h))
     )
+    if max_dim and max(crop.size) > max_dim:
+        crop.thumbnail((max_dim, max_dim))
     buf = io.BytesIO()
-    crop.save(buf, format="JPEG", quality=90)
+    crop.save(buf, format="JPEG", quality=85)
     return buf.getvalue()

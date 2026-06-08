@@ -20,9 +20,37 @@ color-code related points. NO restructuring into bullets/hierarchy.
 - **PDF** — A4 HTML/CSS rendered by Playwright. KaTeX for equations. Mermaid (later).
 
 ## Current status
-- ✅ Phase 0–4 + **4.1 done** (diagram rendering fixed). ⚡ Phase 8 core done (edit+preview UI). **Next: Phase 5** (white/black toggle).
+- ✅ Phase 0–4 + **4.1 + 4.2 done** (diagrams: YOLO vectors + hybrid photo-embed). ⚡ Phase 8 core done. **Next: Phase 5** (white/black toggle).
 - Repo: https://github.com/BitanuCS/handwritten-notes-digitizer (public, branch `main`).
 - Phase table is in `PROJECT_PLAN.md` → "Progress / Current Status".
+
+## Phase 4.2 — diagram positions via YOLO + HYBRID routing
+Problem after 4.1: the LLM emits `diagram_data` but localizes shapes badly → jumbled
+boxes. Fix = detect shapes/arrows with a YOLO model (accurate positions), and route
+between clean vector redraw and a faithful cropped-photo embed.
+
+- **Detector:** YOLOv11 trained on `bernhardschaefer/handwritten-diagram-datasets`
+  (FC_A/FC_B/hdBPMN..., COCO, 24 classes incl. arrows). Train via
+  `notebooks/train_flowchart_yolo.ipynb` on Colab (free T4, ~30-60 min) → download
+  `best.pt` → `backend/models/flowchart.pt` (gitignored; see models/README.md).
+  Local M1/8GB training works but is far too slow (~26 min/epoch) — use Colab.
+- **`services/detect.py`** — loads the model lazily (`detect_available()` guards on the
+  file + ultralytics). `classify_kind()` maps BPMN/flowchart class names → our shape
+  vocab (box/diamond/circle/...). `build_diagram_data()` → shapes + arrows; arrow
+  direction = match each arrow-bbox endpoint to nearest shape (reading-order default).
+  `is_well_connected(dd)` = `shapes>=2 and arrows>=shapes-1`.
+- **HYBRID routing in `vision._fill_diagrams`:** run detect on the diagram crop;
+  if `is_well_connected` → vectors (+ per-shape text via Groq `transcribe_shape.txt`),
+  else **fall back to cropped-photo embed** (clears stale `diagram_data`). Reason: dense
+  full-page flowcharts have low arrow recall, so the photo preserves structure better.
+- **Dedup (`layout._center_inside_diagram`):** text blocks whose center is inside a
+  diagram block are suppressed (already shown by the photo/shapes) — kills the
+  duplicate-text problem. Mirrored in frontend `result/page.tsx` (`centerInsideDiagram`)
+  for the preview + exported PDF; `blocksToText` excludes them too.
+- **`diagrams.py`:** `_image_svg()` embeds the photo as `<image>` inside an SVG so it
+  flows through the same `block.svg` path; `_fit_text()` wraps + scales shape labels;
+  text/labels HTML-escaped. `Block.diagram_image` (base64 JPEG) added to schema + TS.
+- Tests: `test_detect.py`, `test_layout.py`, `_fit_text`/image-svg in `test_diagrams.py`.
 
 ## Phase 4.1 — diagram rendering FIXED (two-pass extraction)
 Was: Groq Llama 4 Scout returned `type: "diagram"` blocks but omitted `diagram_data`, so

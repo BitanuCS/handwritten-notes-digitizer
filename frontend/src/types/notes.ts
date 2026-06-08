@@ -37,6 +37,7 @@ export interface Block {
   text?: string | null;
   color_group?: number | null;
   diagram_data?: DiagramData | null;   // for diagram blocks (from AI)
+  diagram_image?: string | null;       // base64 JPEG crop of the diagram region
   svg?: string | null;                 // computed by backend, not from AI
 }
 
